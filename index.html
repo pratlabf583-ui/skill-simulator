@@ -479,13 +479,32 @@ function parentsOf(childId){
   return state.edges.filter(([p,c])=>c===childId).map(([p])=>p);
 }
 
-// ✅ (추가) 특정 노드가 부모인 "직접 자식" 목록
+// 특정 노드가 부모인 "직접 자식" 목록
 function childrenOf(parentId){
   return state.edges.filter(([p,c])=>p===parentId).map(([_,c])=>c);
 }
 
+/** ✅ (핵심 추가) 특정 노드의 "모든 하위(자손)" 목록 */
+function descendantsOf(rootId){
+  const seen = new Set();
+  const q = [rootId];
+
+  while(q.length){
+    const cur = q.shift();
+    const kids = childrenOf(cur);
+    for(const k of kids){
+      if(seen.has(k)) continue;
+      seen.add(k);
+      q.push(k);
+    }
+  }
+
+  seen.delete(rootId);
+  return [...seen];
+}
+
 function prereqOk(childId){
-  // ✅ 부모가 여러 개면 "전부" max 달성해야 true (AND)
+  // 부모가 여러 개면 "전부" max 달성해야 true (AND)
   const ps = parentsOf(childId);
   for(const p of ps){
     const pn = state.nodes.find(n=>n.id===p);
@@ -534,8 +553,8 @@ function canIncrease(childId){
 }
 
 /** =====================================
- * ✅ (추가) SIM 우클릭 -1 제약:
- * 자식이 하나라도 찍혀 있으면 부모를 내릴 수 없음
+ * ✅ (핵심 수정) SIM 우클릭 -1 제약:
+ * 하위(자손) 노드 중 하나라도 찍혀 있으면 상위는 취소 불가
  * ===================================== */
 function canDecrease(nodeId){
   const n = state.nodes.find(x=>x.id===nodeId);
@@ -546,16 +565,18 @@ function canDecrease(nodeId){
 
   const after = cur - 1;
 
-  // 이 노드가 어떤 자식들의 선행(부모)라면,
-  // 자식이 1 이상 찍혀 있는 상태에서 parent가 max 미만이 되면 불가
-  const childs = childrenOf(nodeId);
-  for(const c of childs){
-    const childCur = state.lvl[c] || 0;
-    if(childCur > 0){
-      // 자식은 이 부모가 "max"여야만 유지 가능하므로 after < max 이면 취소 불가
-      if(after < n.max){
-        return { ok:false, msg:`자식(${c})을 먼저 0으로 취소해야 부모(${nodeId})를 취소할 수 있음` };
-      }
+  // 이 노드가 max 조건을 깨는 순간(=선행조건을 무너뜨리는 순간)만 잠금 검사
+  // max=1이면 1->0, max=5면 5->4가 되는 순간
+  const breaksPrereq = (cur >= n.max) && (after < n.max);
+
+  if(breaksPrereq){
+    const desc = descendantsOf(nodeId);
+    const blocked = desc.find(id => (state.lvl[id] || 0) > 0);
+    if(blocked){
+      return {
+        ok:false,
+        msg:`하위 노드(${blocked})가 남아있어서\n${nodeId}를 취소할 수 없음\n→ 아래(자식/손자)부터 먼저 0으로 취소해줘`
+      };
     }
   }
 
@@ -590,7 +611,7 @@ function draw(){
 
     let ok = true;
     if(state.mode === "SIM"){
-      // ✅ 라인은 child 기준으로: 선행(모든 부모) + 배타(택1)
+      // 라인은 child 기준으로: 선행(모든 부모) + 배타(택1)
       const prereq = prereqOk(c);
 
       let excl = true;
@@ -722,7 +743,6 @@ cv.addEventListener("mousedown", (e)=>{
         }
       }
       if(e.button === 2){
-        // ✅ (수정) 우클릭 -1: 자식이 찍혀 있으면 부모 취소 불가
         const check = canDecrease(node.id);
         if(check.ok){
           const cur = state.lvl[node.id] || 0;
@@ -787,7 +807,7 @@ cv.addEventListener("mousemove",(e)=>{
   }
 });
 
-cv.addEventListener("mouseup",()=>{
+cv.addEventListener("mouseup", ()=>{
   // 빈곳 클릭 -> 노드 추가
   if(state.pendingAdd && state.mode === "EDIT" && !state.viewerMode){
     const { wx, wy } = state.pendingAdd;
@@ -1073,7 +1093,7 @@ els.clearChild.addEventListener("click", ()=>{
   draw();
 });
 
-// ✅ 배타(택1) 설정
+// 배타(택1) 설정
 els.setExclusive.addEventListener("click", ()=>{
   if(state.viewerMode) return;
   if(!state.parents.length || !state.children.length){
