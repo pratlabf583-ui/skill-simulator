@@ -865,7 +865,55 @@ cv.addEventListener("mouseup", ()=>{
 
 cv.addEventListener("mouseleave", ()=>{ stopAllDrag(); draw(); });
 cv.addEventListener("contextmenu", e=>e.preventDefault());
+cv.style.touchAction = "none";
 
+cv.addEventListener("touchstart", (e)=>{
+  e.preventDefault();
+  const t = e.touches[0];
+  const rect = cv.getBoundingClientRect();
+  const sx = t.clientX - rect.left;
+  const sy = t.clientY - rect.top;
+  const w = screenToWorld(sx, sy);
+
+  const node = hitNode(w);
+  if(node){
+    const check = canIncrease(node.id);
+    if(check.ok){
+      state.lvl[node.id] = (state.lvl[node.id] || 0) + 1;
+    }else{
+      els.status.textContent = `❌ ${check.msg}`;
+      els.status.style.color = "#ff6b6b";
+    }
+    draw();
+    return;
+  }
+  startPan(sx, sy);
+}, { passive:false });
+
+cv.addEventListener("touchmove", (e)=>{
+  e.preventDefault();
+  if(!state.panning) return;
+  const t = e.touches[0];
+  const rect = cv.getBoundingClientRect();
+  const sx = t.clientX - rect.left;
+  const sy = t.clientY - rect.top;
+
+  const dx = sx - state.panStart.sx;
+  const dy = sy - state.panStart.sy;
+  state.tx = state.panStart.tx + dx;
+  state.ty = state.panStart.ty + dy;
+  draw();
+}, { passive:false });
+
+cv.addEventListener("touchend", (e)=>{
+  e.preventDefault();
+  stopAllDrag();
+  draw();
+}, { passive:false });
+
+// 휠 줌
+cv.addEventListener("wheel", (e)=>{ ... });
+  
 // 휠 줌
 cv.addEventListener("wheel", (e)=>{
   e.preventDefault();
@@ -1231,6 +1279,7 @@ draw();
 </script>
 </body>
 </html>
+
 
 
 
