@@ -728,10 +728,26 @@ function draw(){
       if(n.id === state.selected) fill = "#101a2e";
     }
     ctx.fillStyle = fill;
-    ctx.fill();
+ctx.fill();
 
-    let stroke = "rgba(120,185,255,0.95)";
-    let lw = 2;
+/* ✅ [추가] 최대치면 노드 겉 형광 링 */
+const isMaxed = n.max > 0 && cur >= n.max;
+if(isMaxed){
+  ctx.save();
+  ctx.globalAlpha = 1;
+  ctx.beginPath();
+  ctx.arc(n.x, n.y, n.r + 6, 0, Math.PI * 2);  // 바깥 링 크기(+6)
+  ctx.strokeStyle = "#7CFF6B";                 // 형광 연두(너 숫자색이랑 동일)
+  ctx.lineWidth = 3;
+  ctx.shadowColor = "rgba(124,255,107,0.95)";
+  ctx.shadowBlur = 14;
+  ctx.stroke();
+  ctx.restore();
+}
+
+let stroke = "rgba(120,185,255,0.95)";
+let lw = 2;
+
 
     if(state.mode === "EDIT" && !state.viewerMode){
       const sel = (n.id === state.selected);
@@ -746,8 +762,6 @@ function draw(){
     ctx.strokeStyle = stroke;
     ctx.lineWidth = lw;
     ctx.stroke();
-
-    const isMaxed = n.max > 0 && cur >= n.max;
 
     ctx.globalAlpha = 1;
     ctx.textAlign = "center";
@@ -1340,6 +1354,7 @@ els.loadJson.addEventListener("click", ()=>{
 </script>
 </body>
 </html>
+
 
 
 
