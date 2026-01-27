@@ -448,6 +448,10 @@ function applyPack(obj){
   state.edges = Array.isArray(obj.edges) ? obj.edges : [];
   state.lvl = (obj.lvl && typeof obj.lvl==="object") ? obj.lvl : {};
   state.exclusives = Array.isArray(obj.exclusives) ? obj.exclusives : [];
+  
+    // ✅ 예전 JSON 호환용 기본값 보정
+  if(!obj.exclusives) state.exclusives = [];
+  if(!obj.ui) obj.ui = { labelFontSize: 18 };
 
   if(obj.view){
     state.scale = Number(obj.view.scale ?? state.scale);
@@ -1330,6 +1334,7 @@ els.loadJson.addEventListener("click", ()=>{
 </script>
 </body>
 </html>
+
 
 
 
