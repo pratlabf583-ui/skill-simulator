@@ -358,13 +358,15 @@ function updateRightPanel(){
   }
 }
 
-function pack(){
+function pack({ includeLvl = true } = {}){
+  const zeroLvl = Object.fromEntries(state.nodes.map(n => [n.id, 0]));
+
   return {
     seasonMax: state.seasonMax,
     owned: state.owned,
     nodes: state.nodes,
     edges: state.edges,
-    lvl: state.lvl,
+    lvl: includeLvl ? state.lvl : zeroLvl,
     view: { scale: state.scale, tx: state.tx, ty: state.ty },
     ui: { labelFontSize: state.labelFontSize },
     bgUrl: state.bgUrl,
@@ -411,8 +413,8 @@ state.nodes.forEach(n=>{
   state.children = [];
 }
 
-function saveToHash(){
-  const str = JSON.stringify(pack());
+function saveToHash({ includeLvl = false } = {}){
+  const str = JSON.stringify(pack({ includeLvl }));
   const b64 = btoa(unescape(encodeURIComponent(str)));
   location.hash = b64;
 }
@@ -928,22 +930,27 @@ els.resetPoints.addEventListener("click", ()=>{
 
 els.saveLink.addEventListener("click", async ()=>{
   if(state.bgUrl && state.bgUrl.startsWith("blob:")){
-    alert("⚠️ 지금 배경은 로컬 파일(blob:)이라서 공유하면 다른 사람은 못 봅니다.\n배경 URL 입력칸에 https 이미지 URL을 넣어주세요.");
+    alert(
+      "⚠️ 지금 배경은 로컬 파일(blob:)이라서 공유하면 다른 사람은 못 봅니다.\n" +
+      "배경 URL 입력칸에 https 이미지 URL을 넣어주세요."
+    );
     return;
   }
 
-  saveToHash();
+  // ✅ 공유용: 포인트(lvl)는 0부터 시작
+  saveToHash({ includeLvl: false });
 
   const url = location.href;
 
   try{
     await navigator.clipboard.writeText(url);
-    alert("✅ 링크 저장 + 복사 완료!\n붙여넣기(Ctrl+V)로 공유하면 됩니다.");
+    alert("✅ 링크 저장 + 복사 완료!\n붙여넣기(Ctrl+V)로 공유하세요.");
   }catch(e){
-    // 일부 환경(권한/HTTP/브라우저 설정)에서 clipboard가 막힐 수 있음
-    prompt("✅ 링크가 만들어졌어요. 아래 링크를 복사해서 공유하세요.", url);
+    // 클립보드 권한 막힌 경우 대비
+    prompt("아래 링크를 복사해서 공유하세요.", url);
   }
 });
+
 
 
 // 줌 버튼
@@ -1224,6 +1231,7 @@ draw();
 </script>
 </body>
 </html>
+
 
 
 
