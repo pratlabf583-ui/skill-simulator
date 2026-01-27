@@ -37,13 +37,11 @@ canvas{width:100%;height:100%;display:block;}
   border:1px solid var(--line);background:#0f1624;color:var(--muted);font-size:12px}
 .small{font-size:12px}
 .btnWide{width:100%}
+
 /* 🔒 SIM 잠김(비번 전) 흐림 처리 */
-.simLocked #cv {
-  filter: blur(2px) brightness(0.75);
-}
-.simLocked .hint {
-  opacity: 0.35;
-}
+.simLocked #cv { filter: blur(2px) brightness(0.75); }
+.simLocked .hint { opacity: 0.35; }
+
 /* 공유(뷰어) 모드에서 편집 UI 숨김 */
 .viewerOnlyHide{display:none !important;}
 </style>
@@ -96,7 +94,6 @@ canvas{width:100%;height:100%;display:block;}
 </div>
 
 <div class="grid" id="gridRoot">
-
   <div class="card">
     <div class="stage" id="stage">
       <div class="toolbar">
@@ -144,12 +141,13 @@ canvas{width:100%;height:100%;display:block;}
 
     <div class="muted" style="margin-top:8px">최대(1/1의 뒤 숫자)</div>
     <input id="nodeMax" type="number" min="1" value="1">
+
     <div class="muted" style="margin-top:8px">선행조건 모드</div>
-<select id="prereqMode" style="width:100%">
-  <option value="ALL">ALL (부모 전부 max 필요)</option>
-  <option value="ANY">ANY (부모 중 하나만 max면 OK)</option>
-</select>
-<div class="muted small">※ 이 설정은 ‘선택한 노드’가 부모를 가질 때만 의미가 있어.</div>
+    <select id="prereqMode" style="width:100%">
+      <option value="ALL">ALL (부모 전부 max 필요)</option>
+      <option value="ANY">ANY (부모 중 하나만 max면 OK)</option>
+    </select>
+    <div class="muted small">※ 이 설정은 ‘선택한 노드’가 부모를 가질 때만 의미가 있어.</div>
 
     <div class="row" style="margin-top:10px">
       <button id="applyNode" class="btnWide">노드 정보 적용</button>
@@ -179,7 +177,6 @@ canvas{width:100%;height:100%;display:block;}
       <button id="clearChild" class="btnWide">자식 목록 비우기</button>
     </div>
 
-    <!-- ✅ 배타(택1) 설정 -->
     <div class="row" style="margin-top:8px">
       <button id="setExclusive" class="btnWide">부모×자식 = 택1(배타)로 설정</button>
       <button id="clearExclusive" class="btnWide">배타(택1) 전부 삭제</button>
@@ -200,18 +197,15 @@ canvas{width:100%;height:100%;display:block;}
       <button id="loadJson" class="btnWide">JSON 불러오기(붙여넣기)</button>
     </div>
   </div>
-
 </div>
 </div>
 
 <script>
 /** =========================
- *  ✅ 관리자 비밀번호
+ *  ✅ 관리자 비밀번호 / SIM 비밀번호
  *  ========================= */
 const ADMIN_PASSWORD = "dkgus12";
-  // ✅ SIM(공유) 비밀번호
-const SIM_PASSWORD = "pramochi#8535";
-
+const SIM_PASSWORD   = "pramochi#8535";
 
 const cv = document.getElementById("cv");
 const ctx = cv.getContext("2d");
@@ -226,11 +220,9 @@ const state = {
   lvl: {},
   selected: null,
 
-  // ✅ 다중 부모/자식 목록
   parents: [],
   children: [],
 
-  // ✅ 배타(택1) 그룹
   exclusives: [],
 
   bg: null,
@@ -271,7 +263,6 @@ const els = {
   resetPoints: document.getElementById("resetPoints"),
   saveLink: document.getElementById("saveLink"),
   shareInfo: document.getElementById("shareInfo"),
-
   retrySimPwd: document.getElementById("retrySimPwd"),
 
   bgUrlInput: document.getElementById("bgUrlInput"),
@@ -348,8 +339,7 @@ function askSimPassword(){
   setSimLocked(false);
   draw();
 }
-  
-  
+
 function resize(){
   const r = stage.getBoundingClientRect();
   cv.width = r.width * devicePixelRatio;
@@ -388,7 +378,6 @@ function updateRightPanel(){
     els.nodeId.value = n.id;
     els.nodeMax.value = n.max;
     if(els.prereqMode) els.prereqMode.value = n.prereqMode || "ALL";
-
     els.nodeSize.value = n.r;
     els.nodeSizeLabel.textContent = String(n.r);
   }else{
@@ -412,7 +401,6 @@ function updateRightPanel(){
 
 function pack({ includeLvl = true } = {}){
   const zeroLvl = Object.fromEntries(state.nodes.map(n => [n.id, 0]));
-
   return {
     seasonMax: state.seasonMax,
     owned: state.owned,
@@ -434,6 +422,7 @@ function syncJsonBox(){
 function applyPack(obj){
   state.owned = Number(obj.owned ?? state.owned);
   state.nodes = Array.isArray(obj.nodes) ? obj.nodes : [];
+
   // ✅ 구버전 데이터 호환: prereqMode 없으면 ALL로 보정
   state.nodes.forEach(n=>{
     if(!n.prereqMode) n.prereqMode = "ALL";
@@ -441,7 +430,6 @@ function applyPack(obj){
 
   state.edges = Array.isArray(obj.edges) ? obj.edges : [];
   state.lvl = (obj.lvl && typeof obj.lvl==="object") ? obj.lvl : {};
-
   state.exclusives = Array.isArray(obj.exclusives) ? obj.exclusives : [];
 
   if(obj.view){
@@ -547,13 +535,9 @@ function toggleIn(arr, id){
 function parentsOf(childId){
   return state.edges.filter(([p,c])=>c===childId).map(([p])=>p);
 }
-
-// 특정 노드가 부모인 "직접 자식" 목록
 function childrenOf(parentId){
   return state.edges.filter(([p,c])=>p===parentId).map(([_,c])=>c);
 }
-
-/** ✅ (핵심 추가) 특정 노드의 "모든 하위(자손)" 목록 */
 function descendantsOf(rootId){
   const seen = new Set();
   const q = [rootId];
@@ -567,7 +551,6 @@ function descendantsOf(rootId){
       q.push(k);
     }
   }
-
   seen.delete(rootId);
   return [...seen];
 }
@@ -580,7 +563,6 @@ function prereqOk(childId){
   const mode = (child && child.prereqMode) ? child.prereqMode : "ALL";
 
   if(mode === "ANY"){
-    // 부모 중 하나만 max면 OK
     for(const p of ps){
       const pn = state.nodes.find(n=>n.id===p);
       if(!pn) continue;
@@ -590,7 +572,6 @@ function prereqOk(childId){
     return false;
   }
 
-  // 기본: ALL (부모 전부 max 필요)
   for(const p of ps){
     const pn = state.nodes.find(n=>n.id===p);
     if(!pn) continue;
@@ -603,13 +584,10 @@ function prereqOk(childId){
 function getExclusiveGroup(parentId, childId){
   return state.exclusives.find(g => g && g.parent===parentId && Array.isArray(g.group) && g.group.includes(childId)) || null;
 }
-
 function otherChosenInGroup(groupObj, selfId){
   return (groupObj.group||[]).some(id => id !== selfId && (state.lvl[id] || 0) > 0);
 }
-
 function exclusiveOk(childId){
-  // 모든 부모에 대해 배타 그룹이 있으면 "다른 선택이 찍혔는지" 검사
   const ps = parentsOf(childId);
   for(const p of ps){
     const g = getExclusiveGroup(p, childId);
@@ -623,7 +601,6 @@ function canIncrease(childId){
   const n = state.nodes.find(x=>x.id===childId);
   if(!n) return { ok:false, msg:"노드 없음" };
 
-  // 선행(모든 부모 max)
   if(!prereqOk(childId)){
     const childNode = state.nodes.find(x=>x.id===childId);
     const mode = (childNode && childNode.prereqMode) ? childNode.prereqMode : "ALL";
@@ -633,21 +610,15 @@ function canIncrease(childId){
     return { ok:false, msg: hint };
   }
 
-  // 배타(택1)
   if(!exclusiveOk(childId)) return { ok:false, msg:"같은 분기(택1) 라인이 이미 선택됨" };
 
   const cur = state.lvl[childId] || 0;
   if(cur >= n.max) return { ok:false, msg:"이미 최대" };
-
   if(getUsed() + 1 > state.owned) return { ok:false, msg:"보유 포인트 부족" };
 
   return { ok:true, msg:"OK" };
 }
 
-/** =====================================
- * ✅ (핵심 수정) SIM 우클릭 -1 제약:
- * 하위(자손) 노드 중 하나라도 찍혀 있으면 상위는 취소 불가
- * ===================================== */
 function canDecrease(nodeId){
   const n = state.nodes.find(x=>x.id===nodeId);
   if(!n) return { ok:false, msg:"노드 없음" };
@@ -656,9 +627,6 @@ function canDecrease(nodeId){
   if(cur <= 0) return { ok:false, msg:"이미 0" };
 
   const after = cur - 1;
-
-  // 이 노드가 max 조건을 깨는 순간(=선행조건을 무너뜨리는 순간)만 잠금 검사
-  // max=1이면 1->0, max=5면 5->4가 되는 순간
   const breaksPrereq = (cur >= n.max) && (after < n.max);
 
   if(breaksPrereq){
@@ -686,7 +654,6 @@ function draw(){
     state.ty*devicePixelRatio
   );
 
-  // 배경
   if(state.bg){
     ctx.globalAlpha = 1;
     ctx.drawImage(state.bg, 0, 0);
@@ -695,7 +662,6 @@ function draw(){
   const lineAlpha = (state.mode === "SIM") ? 0.55 : 1;
   const nodeAlpha = (state.mode === "SIM") ? 0.45 : 1;
 
-  // 라인
   state.edges.forEach(([p,c])=>{
     const pn = state.nodes.find(n=>n.id===p);
     const cn = state.nodes.find(n=>n.id===c);
@@ -703,14 +669,10 @@ function draw(){
 
     let ok = true;
     if(state.mode === "SIM"){
-      // 라인은 child 기준으로: 선행(모든 부모) + 배타(택1)
       const prereq = prereqOk(c);
-
       let excl = true;
       const g = getExclusiveGroup(p, c);
-      if(g){
-        excl = !otherChosenInGroup(g, c);
-      }
+      if(g) excl = !otherChosenInGroup(g, c);
       ok = prereq && excl;
     }
 
@@ -723,7 +685,6 @@ function draw(){
     ctx.stroke();
   });
 
-  // 노드 + 숫자
   state.nodes.forEach(n=>{
     const cur = state.lvl[n.id] || 0;
 
@@ -745,7 +706,6 @@ function draw(){
       const sel = (n.id === state.selected);
       const isP = isIn(state.parents, n.id);
       const isC = isIn(state.children, n.id);
-
       if(isP) { stroke = "rgba(124,255,107,0.98)"; lw = 3; }
       if(isC) { stroke = "rgba(190,120,255,0.98)"; lw = 3; }
       if(sel) { stroke = "rgba(255,230,120,0.98)"; lw = 4; }
@@ -814,7 +774,6 @@ cv.addEventListener("mousedown", (e)=>{
   if(node){
     state.selected = node.id;
 
-    // EDIT에서만 노드 드래그
     if(state.mode === "EDIT" && !state.viewerMode){
       if(e.button === 0){
         state.draggingNode = true;
@@ -823,7 +782,7 @@ cv.addEventListener("mousedown", (e)=>{
         state.dragOff.y = w.y - node.y;
       }
     }else{
-      // ✅ 잠김이면 노드 포인트 조작 막기 (화면 이동은 가능)
+      // ✅ (7A) 잠김이면 노드 포인트 조작만 막기 (화면 이동/줌은 가능)
       if(state.viewerMode && state.mode === "SIM" && state.simLocked){
         els.status.textContent = "🔒 비밀번호 입력 후 노드 조작이 가능합니다. (비밀번호 재입력 버튼 눌러주세요)";
         els.status.style.color = "#ff6b6b";
@@ -831,7 +790,6 @@ cv.addEventListener("mousedown", (e)=>{
         return;
       }
 
-      // SIM 포인트 조작 (+ 선행 AND + 배타)
       if(e.button === 0){
         const check = canIncrease(node.id);
         if(check.ok){
@@ -858,7 +816,6 @@ cv.addEventListener("mousedown", (e)=>{
     return;
   }
 
-  // 빈 곳
   if(e.button === 0){
     if(state.mode === "EDIT" && !state.viewerMode){
       state.pendingAdd = { sx, sy, wx: w.x, wy: w.y };
@@ -885,7 +842,6 @@ cv.addEventListener("mousemove",(e)=>{
     return;
   }
 
-  // 클릭(노드 추가) vs 드래그(화면 이동)
   if(state.pendingAdd){
     const dx = sx - state.pendingAdd.sx;
     const dy = sy - state.pendingAdd.sy;
@@ -908,7 +864,6 @@ cv.addEventListener("mousemove",(e)=>{
 });
 
 cv.addEventListener("mouseup", ()=>{
-  // 빈곳 클릭 -> 노드 추가
   if(state.pendingAdd && state.mode === "EDIT" && !state.viewerMode){
     const { wx, wy } = state.pendingAdd;
     const id = `N${String(state.nodes.length+1).padStart(3,"0")}`;
@@ -934,7 +889,7 @@ cv.addEventListener("touchstart", (e)=>{
 
   const node = hitNode(w);
   if(node){
-    // ✅ 잠김이면 터치로 노드 조작 막기
+    // ✅ (7B) 잠김이면 터치로 노드 조작 막기
     if(state.viewerMode && state.mode === "SIM" && state.simLocked){
       els.status.textContent = "🔒 비밀번호 입력 후 노드 조작이 가능합니다. (비밀번호 재입력 버튼 눌러주세요)";
       els.status.style.color = "#ff6b6b";
@@ -952,6 +907,7 @@ cv.addEventListener("touchstart", (e)=>{
     draw();
     return;
   }
+
   startPan(sx, sy);
 }, { passive:false });
 
@@ -975,7 +931,7 @@ cv.addEventListener("touchend", (e)=>{
   stopAllDrag();
   draw();
 }, { passive:false });
-  
+
 // 휠 줌
 cv.addEventListener("wheel", (e)=>{
   e.preventDefault();
@@ -1041,7 +997,6 @@ els.resetPoints.addEventListener("click", ()=>{
 els.retrySimPwd.addEventListener("click", ()=>{
   askSimPassword();
 });
-  
 
 els.saveLink.addEventListener("click", async ()=>{
   if(state.bgUrl && state.bgUrl.startsWith("blob:")){
@@ -1052,21 +1007,16 @@ els.saveLink.addEventListener("click", async ()=>{
     return;
   }
 
-  // ✅ 공유용: 포인트(lvl)는 0부터 시작
   saveToHash({ includeLvl: false });
-
   const url = location.href;
 
   try{
     await navigator.clipboard.writeText(url);
     alert("✅ 링크 저장 + 복사 완료!\n붙여넣기(Ctrl+V)로 공유하세요.");
   }catch(e){
-    // 클립보드 권한 막힌 경우 대비
     prompt("아래 링크를 복사해서 공유하세요.", url);
   }
 });
-
-
 
 // 줌 버튼
 function zoomAtCenter(factor){
@@ -1168,7 +1118,6 @@ els.applyNode.addEventListener("click", ()=>{
     state.parents = state.parents.map(x=>x===oldId?newId:x);
     state.children = state.children.map(x=>x===oldId?newId:x);
 
-    // 배타 치환
     state.exclusives = state.exclusives.map(g=>{
       const parent = (g.parent===oldId) ? newId : g.parent;
       const group = (g.group||[]).map(id=>id===oldId?newId:id);
@@ -1196,7 +1145,6 @@ els.delNode.addEventListener("click", ()=>{
   state.parents = state.parents.filter(x=>x!==id);
   state.children = state.children.filter(x=>x!==id);
 
-  // 배타에서도 제거 + 그룹 정리
   state.exclusives = state.exclusives
     .map(g => ({ parent: g.parent, group: (g.group||[]).filter(x=>x!==id) }))
     .filter(g => g.parent !== id && (g.group||[]).length >= 2);
@@ -1333,12 +1281,11 @@ els.labelSizeLabel.textContent = String(state.labelFontSize);
 // 시작
 resize();
 
-// ✅ (8) 링크로 접속(loaded=true) 시 즉시 SIM + 잠금 + 비번 팝업
+/** ✅ (8) 링크로 접속(loaded=true) 시 즉시 SIM + 잠금 + 비번 팝업 */
 const loaded = loadFromHash();
 if(loaded){
   setViewerMode(true);
 
-  // ✅ 공유 링크로 들어오면 무조건 SIM + 잠금
   state.mode = "SIM";
   els.modeBadge.textContent = "SIM(공유)";
 
@@ -1357,4 +1304,3 @@ draw();
 </script>
 </body>
 </html>
-
