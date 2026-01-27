@@ -926,14 +926,22 @@ els.resetPoints.addEventListener("click", ()=>{
   draw();
 });
 
-els.saveLink.addEventListener("click", ()=>{
+els.saveLink.addEventListener("click", async ()=>{
   if(state.bgUrl && state.bgUrl.startsWith("blob:")){
     alert("⚠️ 지금 배경은 로컬 파일(blob:)이라서 공유하면 다른 사람은 못 봅니다.\n배경 URL 입력칸에 https 이미지 URL을 넣어주세요.");
     return;
   }
+
   saveToHash();
-  alert("링크 저장 완료! 주소창 링크를 공유하면 배경/노드/라인/포인트/배타규칙이 같이 보입니다.");
+
+  try{
+    await navigator.clipboard.writeText(location.href);
+    alert("✅ 링크가 클립보드에 복사되었습니다!");
+  }catch(e){
+    alert("링크 저장 완료!\n주소창에서 직접 복사해 주세요.");
+  }
 });
+
 
 // 줌 버튼
 function zoomAtCenter(factor){
@@ -1210,5 +1218,6 @@ draw();
 </script>
 </body>
 </html>
+
 
 
