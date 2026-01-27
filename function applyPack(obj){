@@ -470,8 +470,14 @@ function applyPack(obj){
   }
 
   state.selected = null;
-  state.parents = [];
-  state.children = [];
+state.parents = [];
+state.children = [];
+
+// ✅ UI 입력값도 같이 갱신
+els.ownedSp.value = String(state.owned);
+if(!state.viewerMode) els.bgUrlInput.value = state.bgUrl || "";
+
+
 }
 
 function saveToHash({ includeLvl = false } = {}){
@@ -1334,6 +1340,7 @@ els.loadJson.addEventListener("click", ()=>{
 </script>
 </body>
 </html>
+
 
 
 
