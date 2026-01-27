@@ -93,7 +93,6 @@ canvas{width:100%;height:100%;display:block;}
   <div class="card">
     <div class="stage" id="stage">
       <div class="toolbar">
-        <!-- ✅ 배경: URL 방식 + 로컬 파일(편집자만) -->
         <input id="bgUrlInput" class="editUI" placeholder="배경 이미지 URL 붙여넣기 (공유용)" style="width:320px">
         <input id="bgFile" class="editUI" type="file" accept="image/*">
 
@@ -127,7 +126,6 @@ canvas{width:100%;height:100%;display:block;}
     </div>
   </div>
 
-  <!-- ✅ 오른쪽 패널: 편집 전용, 공유자는 숨김 -->
   <div class="card editUI" id="rightPanel">
     <div class="kpi" style="margin-bottom:6px">선택한 노드</div>
     <div class="muted" id="selText">없음</div>
@@ -147,21 +145,25 @@ canvas{width:100%;height:100%;display:block;}
 
     <div class="hr"></div>
 
-    <div class="kpi" style="font-size:16px">라인 연결</div>
+    <div class="kpi" style="font-size:16px">라인 연결 (다중 부모/자식 지원)</div>
     <div class="muted small" style="margin:6px 0">
-      1) 노드 클릭 → “부모로 지정”<br>
-      2) 다른 노드 클릭 → “자식으로 지정”<br>
-      3) “연결 추가” (부모→자식)
+      - 노드 클릭 후 “부모로 지정/자식으로 지정”을 눌러 목록에 추가(토글)<br>
+      - “연결 추가/제거”는 부모목록×자식목록 전체에 적용
     </div>
 
     <div class="row">
-      <button id="setParent" class="btnWide">부모로 지정</button>
-      <button id="setChild" class="btnWide">자식으로 지정</button>
+      <button id="setParent" class="btnWide">부모로 지정(토글)</button>
+      <button id="setChild" class="btnWide">자식으로 지정(토글)</button>
     </div>
 
     <div class="row" style="margin-top:8px">
       <button id="addEdge" class="btnWide">연결 추가</button>
       <button id="removeEdge" class="btnWide">연결 제거</button>
+    </div>
+
+    <div class="row" style="margin-top:8px">
+      <button id="clearParent" class="btnWide">부모 목록 비우기</button>
+      <button id="clearChild" class="btnWide">자식 목록 비우기</button>
     </div>
 
     <div class="muted small" id="pcInfo" style="margin-top:8px"></div>
@@ -200,8 +202,10 @@ const state = {
   edges: [],
   lvl: {},
   selected: null,
-  parent: null,
-  child: null,
+
+  // ✅ 다중 부모/자식 목록
+  parents: [],
+  children: [],
 
   bg: null,
   bgUrl: null,
@@ -221,8 +225,8 @@ const state = {
 
   labelFontSize: 18,
 
-  viewerMode: false,     // 공유자 SIM전용
-  adminUnlocked: false,  // 비번 맞으면 편집 UI 표시
+  viewerMode: false,
+  adminUnlocked: false,
 };
 
 const els = {
@@ -261,6 +265,8 @@ const els = {
   setChild: document.getElementById("setChild"),
   addEdge: document.getElementById("addEdge"),
   removeEdge: document.getElementById("removeEdge"),
+  clearParent: document.getElementById("clearParent"),
+  clearChild: document.getElementById("clearChild"),
   pcInfo: document.getElementById("pcInfo"),
 
   json: document.getElementById("json"),
@@ -312,7 +318,10 @@ function updateRightPanel(){
     els.nodeId.value = "";
     els.nodeMax.value = 1;
   }
-  els.pcInfo.textContent = `부모: ${state.parent ?? "-"} / 자식: ${state.child ?? "-"}`;
+
+  const pTxt = state.parents.length ? state.parents.join(", ") : "-";
+  const cTxt = state.children.length ? state.children.join(", ") : "-";
+  els.pcInfo.textContent = `부모 목록: ${pTxt}\n자식 목록: ${cTxt}`;
 }
 
 function pack(){
@@ -324,7 +333,7 @@ function pack(){
     lvl: state.lvl,
     view: { scale: state.scale, tx: state.tx, ty: state.ty },
     ui: { labelFontSize: state.labelFontSize },
-    bgUrl: state.bgUrl, // ✅ 배경 URL은 공유를 위해 저장
+    bgUrl: state.bgUrl,
   };
 }
 
@@ -356,8 +365,8 @@ function applyPack(obj){
   }
 
   state.selected = null;
-  state.parent = null;
-  state.child = null;
+  state.parents = [];
+  state.children = [];
 }
 
 function saveToHash(){
@@ -379,10 +388,6 @@ function loadFromHash(){
   }
 }
 
-/** ✅ 뷰어모드: 편집 UI 숨김 + SIM 고정
- *  🔥 중요 수정: 레이아웃이 바뀌면 캔버스 크기/좌표계가 달라져서 "클릭이 안 되는" 현상이 생김
- *  → setViewerMode() 마지막에 resize()를 강제로 호출해서 해결
- */
 function setViewerMode(on){
   state.viewerMode = on;
 
@@ -402,16 +407,14 @@ function setViewerMode(on){
     els.shareInfo.textContent = "";
   }
 
-  // ✅ 레이아웃 반영 후 캔버스 리사이즈(좌표계/히트테스트 동기화)
-  requestAnimationFrame(()=>resize());
+  draw();
 }
 
-/** ✅ 배경 URL 로드 (blob:은 공유 불가) */
 function loadBgFromUrl(url, alsoSetInput=true){
   if(!url) return;
 
   if(url.startsWith("blob:")){
-    alert("⚠️ blob: 로 시작하는 URL은 내 PC에서만 보이고 공유가 불가능해.\n이미지를 웹에 올린 뒤 https URL을 넣어줘.");
+    alert("⚠️ blob: 로 시작하는 URL은 내 PC에서만 보이고 공유가 불가능해.\n이미지를 웹에 올린 뒤 https 이미지 URL을 넣어줘.");
   }
 
   const img = new Image();
@@ -430,9 +433,16 @@ function loadBgFromUrl(url, alsoSetInput=true){
     draw();
   };
   img.onerror = ()=>{
-    alert("배경 이미지 URL 로드 실패!\n- URL이 직접 이미지(.png/.jpg)로 열리는지 확인\n- 권한 제한(로그인 필요) URL이면 안됨");
+    alert("배경 이미지 URL 로드 실패!\n- URL이 직접 이미지(.png/.jpg)로 열리는지 확인\n- 권한 제한(로그인 필요) URL이면 안 됨");
   };
   img.src = url;
+}
+
+function isIn(arr, id){ return arr.indexOf(id) !== -1; }
+function toggleIn(arr, id){
+  const i = arr.indexOf(id);
+  if(i === -1) arr.push(id);
+  else arr.splice(i,1);
 }
 
 function draw(){
@@ -480,15 +490,38 @@ function draw(){
   state.nodes.forEach(n=>{
     const cur = state.lvl[n.id] || 0;
 
+    // 기본 노드
     ctx.globalAlpha = nodeAlpha;
     ctx.beginPath();
     ctx.arc(n.x, n.y, n.r, 0, Math.PI*2);
-    ctx.fillStyle = "#0c1220";
+
+    // EDIT에서 클릭/지정 상태가 잘 보이도록 내부 살짝 차이
+    let fill = "#0c1220";
+    if(state.mode === "EDIT" && !state.viewerMode){
+      if(n.id === state.selected) fill = "#101a2e";
+    }
+    ctx.fillStyle = fill;
     ctx.fill();
-    ctx.strokeStyle = "rgba(120,185,255,0.95)";
-    ctx.lineWidth = 2;
+
+    // ✅ 링 색상 규칙 (EDIT에서만 강조)
+    let stroke = "rgba(120,185,255,0.95)";
+    let lw = 2;
+
+    if(state.mode === "EDIT" && !state.viewerMode){
+      const sel = (n.id === state.selected);
+      const isP = isIn(state.parents, n.id);
+      const isC = isIn(state.children, n.id);
+
+      if(isP) { stroke = "rgba(124,255,107,0.98)"; lw = 3; }          // 부모: 초록
+      if(isC) { stroke = "rgba(190,120,255,0.98)"; lw = 3; }          // 자식: 보라
+      if(sel) { stroke = "rgba(255,230,120,0.98)"; lw = 4; }          // 선택: 노랑(최우선)
+    }
+
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = lw;
     ctx.stroke();
 
+    // 숫자
     const isMaxed = n.max > 0 && cur >= n.max;
 
     ctx.globalAlpha = 1;
@@ -664,7 +697,6 @@ els.labelSize.addEventListener("input", ()=>{
 });
 
 els.toggleMode.addEventListener("click", ()=>{
-  // 공유자는 SIM 고정
   if(state.viewerMode){
     state.mode = "SIM";
     draw();
@@ -674,11 +706,11 @@ els.toggleMode.addEventListener("click", ()=>{
   draw();
 });
 
-// ✅ 관리자 비번: 성공하면 viewerMode 해제 + 편집 UI 복구
 els.adminEdit.addEventListener("click", ()=>{
   if(state.adminUnlocked){
     setViewerMode(false);
     state.mode = "EDIT";
+    draw();
     return;
   }
   const input = prompt("관리자 비밀번호를 입력하세요");
@@ -691,6 +723,7 @@ els.adminEdit.addEventListener("click", ()=>{
   setViewerMode(false);
   state.mode = "EDIT";
   alert("편집 잠금 해제 완료!");
+  draw();
 });
 
 els.resetPoints.addEventListener("click", ()=>{
@@ -761,8 +794,8 @@ els.clearAll.addEventListener("click", ()=>{
   state.edges = [];
   state.lvl = {};
   state.selected = null;
-  state.parent = null;
-  state.child = null;
+  state.parents = [];
+  state.children = [];
   draw();
 });
 
@@ -803,9 +836,11 @@ els.applyNode.addEventListener("click", ()=>{
     state.lvl[newId] = state.lvl[oldId] || 0;
     delete state.lvl[oldId];
 
+    // ✅ 다중 목록도 같이 치환
+    state.parents = state.parents.map(x=>x===oldId?newId:x);
+    state.children = state.children.map(x=>x===oldId?newId:x);
+
     if(state.selected===oldId) state.selected=newId;
-    if(state.parent===oldId) state.parent=newId;
-    if(state.child===oldId) state.child=newId;
   }
 
   n.max = newMax;
@@ -820,45 +855,78 @@ els.delNode.addEventListener("click", ()=>{
   state.nodes = state.nodes.filter(n=>n.id!==id);
   state.edges = state.edges.filter(([p,c])=>p!==id && c!==id);
   delete state.lvl[id];
-  if(state.parent===id) state.parent=null;
-  if(state.child===id) state.child=null;
+
+  state.parents = state.parents.filter(x=>x!==id);
+  state.children = state.children.filter(x=>x!==id);
+
   state.selected=null;
   draw();
 });
 
+// ✅ 다중 부모/자식 토글
 els.setParent.addEventListener("click", ()=>{
   if(state.viewerMode) return;
   if(!state.selected) return;
-  state.parent = state.selected;
+  toggleIn(state.parents, state.selected);
+  // 같은 노드가 부모/자식 둘 다 되는 걸 막고 싶으면 아래 주석 해제:
+  // state.children = state.children.filter(x=>x!==state.selected);
   draw();
 });
 els.setChild.addEventListener("click", ()=>{
   if(state.viewerMode) return;
   if(!state.selected) return;
-  state.child = state.selected;
+  toggleIn(state.children, state.selected);
+  // state.parents = state.parents.filter(x=>x!==state.selected);
   draw();
 });
+
+// 연결 추가/제거: 부모목록 × 자식목록
 els.addEdge.addEventListener("click", ()=>{
   if(state.viewerMode) return;
-  if(!state.parent || !state.child){
-    alert("부모/자식을 먼저 지정해줘.");
+  if(!state.parents.length || !state.children.length){
+    alert("부모 목록과 자식 목록을 먼저 지정해줘.");
     return;
   }
-  if(state.parent === state.child){
-    alert("부모와 자식이 같을 수 없어.");
-    return;
+
+  let added = 0;
+  for(const p of state.parents){
+    for(const c of state.children){
+      if(p === c) continue;
+      const exists = state.edges.some(([pp,cc])=>pp===p && cc===c);
+      if(!exists){
+        state.edges.push([p,c]);
+        added++;
+      }
+    }
   }
-  const exists = state.edges.some(([p,c])=>p===state.parent && c===state.child);
-  if(!exists) state.edges.push([state.parent, state.child]);
+  if(!added) alert("추가할 새 연결이 없어요. (이미 존재하거나 부모=자식)");
   draw();
 });
+
 els.removeEdge.addEventListener("click", ()=>{
   if(state.viewerMode) return;
-  if(!state.parent || !state.child){
-    alert("부모/자식을 먼저 지정해줘.");
+  if(!state.parents.length || !state.children.length){
+    alert("부모 목록과 자식 목록을 먼저 지정해줘.");
     return;
   }
-  state.edges = state.edges.filter(([p,c])=>!(p===state.parent && c===state.child));
+
+  const before = state.edges.length;
+  state.edges = state.edges.filter(([p,c])=>{
+    return !(state.parents.includes(p) && state.children.includes(c));
+  });
+  const removed = before - state.edges.length;
+  if(!removed) alert("제거할 연결이 없어요.");
+  draw();
+});
+
+els.clearParent.addEventListener("click", ()=>{
+  if(state.viewerMode) return;
+  state.parents = [];
+  draw();
+});
+els.clearChild.addEventListener("click", ()=>{
+  if(state.viewerMode) return;
+  state.children = [];
   draw();
 });
 
@@ -893,7 +961,6 @@ els.labelSizeLabel.textContent = String(state.labelFontSize);
 resize();
 const loaded = loadFromHash();
 if(loaded){
-  // 공유 링크로 들어오면 SIM + 편집 숨김
   setViewerMode(true);
   state.mode = "SIM";
 }else{
