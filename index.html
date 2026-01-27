@@ -17,7 +17,7 @@ body{margin:0;background:var(--bg);color:var(--text);
   border-radius:14px;padding:14px;}
 .top{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-start;}
 .kpi{font-size:18px;font-weight:900;}
-.muted{color:var(--muted);font-size:13px;}
+.muted{color:var(--muted);font-size:13px;white-space:pre-wrap;}
 button,input,textarea{
   background:#0f1624;color:var(--text);
   border:1px solid var(--line);border-radius:10px;padding:8px 12px;
@@ -120,7 +120,7 @@ canvas{width:100%;height:100%;display:block;}
       <div class="hint" id="hint">
         EDIT: 빈곳 클릭=노드추가 / 노드 드래그=이동 / 빈곳 드래그=화면이동<br>
         SIM: 노드 좌클릭 +1 / 우클릭 -1 / 빈곳 드래그=화면이동<br>
-        빨간 라인: 부모 노드가 최대치 미달(선행 조건 미충족) 또는 택1 라인이 이미 선택됨<br>
+        빨간 라인: 선행(부모) 미충족 또는 택1 라인이 이미 선택됨<br>
         형광 숫자: 노드가 최대치 달성(예: 1/1, 5/5)
       </div>
     </div>
@@ -166,7 +166,7 @@ canvas{width:100%;height:100%;display:block;}
       <button id="clearChild" class="btnWide">자식 목록 비우기</button>
     </div>
 
-    <!-- ✅ 추가: 택1(배타) 설정 버튼 -->
+    <!-- ✅ 배타(택1) 설정 -->
     <div class="row" style="margin-top:8px">
       <button id="setExclusive" class="btnWide">부모×자식 = 택1(배타)로 설정</button>
       <button id="clearExclusive" class="btnWide">배타(택1) 전부 삭제</button>
@@ -214,8 +214,7 @@ const state = {
   parents: [],
   children: [],
 
-  // ✅ 추가: 배타(택1) 그룹
-  // [{ parent:"N001", group:["N010","N011","N012"] }]
+  // ✅ 배타(택1) 그룹: [{ parent:"N001", group:["N010","N011","N012"] }]
   exclusives: [],
 
   bg: null,
@@ -280,7 +279,6 @@ const els = {
   clearChild: document.getElementById("clearChild"),
   pcInfo: document.getElementById("pcInfo"),
 
-  // ✅ 추가: 배타 버튼/정보
   setExclusive: document.getElementById("setExclusive"),
   clearExclusive: document.getElementById("clearExclusive"),
   exInfo: document.getElementById("exInfo"),
@@ -303,6 +301,7 @@ window.addEventListener("resize", resize);
 function screenToWorld(sx, sy){
   return { x: (sx - state.tx) / state.scale, y: (sy - state.ty) / state.scale };
 }
+
 function getUsed(){
   return Object.values(state.lvl).reduce((a,b)=>a+b,0);
 }
@@ -339,12 +338,13 @@ function updateRightPanel(){
   const cTxt = state.children.length ? state.children.join(", ") : "-";
   els.pcInfo.textContent = `부모 목록: ${pTxt}\n자식 목록: ${cTxt}`;
 
-  // ✅ 배타 그룹 간단 표시
-  if(state.exclusives.length){
-    const lines = state.exclusives.map(g => `• ${g.parent} : [${(g.group||[]).join(", ")}]`);
-    els.exInfo.textContent = `배타(택1) 그룹 ${state.exclusives.length}개\n` + lines.join("\n");
-  }else{
-    els.exInfo.textContent = "배타(택1) 그룹: 없음";
+  if(els.exInfo){
+    if(state.exclusives && state.exclusives.length){
+      const lines = state.exclusives.map(g => `• ${g.parent} : [${(g.group||[]).join(", ")}]`);
+      els.exInfo.textContent = `배타(택1) 그룹 ${state.exclusives.length}개\n` + lines.join("\n");
+    }else{
+      els.exInfo.textContent = "배타(택1) 그룹: 없음";
+    }
   }
 }
 
@@ -358,8 +358,6 @@ function pack(){
     view: { scale: state.scale, tx: state.tx, ty: state.ty },
     ui: { labelFontSize: state.labelFontSize },
     bgUrl: state.bgUrl,
-
-    // ✅ 추가
     exclusives: state.exclusives,
   };
 }
@@ -375,7 +373,6 @@ function applyPack(obj){
   state.edges = Array.isArray(obj.edges) ? obj.edges : [];
   state.lvl = (obj.lvl && typeof obj.lvl==="object") ? obj.lvl : {};
 
-  // ✅ 추가
   state.exclusives = Array.isArray(obj.exclusives) ? obj.exclusives : [];
 
   if(obj.view){
@@ -476,18 +473,14 @@ function toggleIn(arr, id){
 }
 
 /** =====================================
- * ✅ 추가: 선행조건 + 배타(택1) 검사 유틸
+ * ✅ 선행조건 + 배타(택1) 검사 유틸
  * ===================================== */
 function parentsOf(childId){
   return state.edges.filter(([p,c])=>c===childId).map(([p])=>p);
 }
-function getExclusiveGroup(parentId, childId){
-  return state.exclusives.find(g => g && g.parent===parentId && Array.isArray(g.group) && g.group.includes(childId)) || null;
-}
-function otherChosenInGroup(groupObj, selfId){
-  return (groupObj.group||[]).some(id => id !== selfId && (state.lvl[id] || 0) > 0);
-}
+
 function prereqOk(childId){
+  // ✅ 부모가 여러 개면 "전부" max 달성해야 true (AND)
   const ps = parentsOf(childId);
   for(const p of ps){
     const pn = state.nodes.find(n=>n.id===p);
@@ -497,7 +490,17 @@ function prereqOk(childId){
   }
   return true;
 }
+
+function getExclusiveGroup(parentId, childId){
+  return state.exclusives.find(g => g && g.parent===parentId && Array.isArray(g.group) && g.group.includes(childId)) || null;
+}
+
+function otherChosenInGroup(groupObj, selfId){
+  return (groupObj.group||[]).some(id => id !== selfId && (state.lvl[id] || 0) > 0);
+}
+
 function exclusiveOk(childId){
+  // 모든 부모에 대해 배타 그룹이 있으면 "다른 선택이 찍혔는지" 검사
   const ps = parentsOf(childId);
   for(const p of ps){
     const g = getExclusiveGroup(p, childId);
@@ -506,11 +509,15 @@ function exclusiveOk(childId){
   }
   return true;
 }
+
 function canIncrease(childId){
   const n = state.nodes.find(x=>x.id===childId);
   if(!n) return { ok:false, msg:"노드 없음" };
 
-  if(!prereqOk(childId)) return { ok:false, msg:"선행(부모) 조건 미충족" };
+  // 선행(모든 부모 max)
+  if(!prereqOk(childId)) return { ok:false, msg:"선행(부모) 조건 미충족 (부모 전부 max 필요)" };
+
+  // 배타(택1)
   if(!exclusiveOk(childId)) return { ok:false, msg:"같은 분기(택1) 라인이 이미 선택됨" };
 
   const cur = state.lvl[childId] || 0;
@@ -532,7 +539,7 @@ function draw(){
     state.ty*devicePixelRatio
   );
 
-  // 배경은 항상 선명
+  // 배경
   if(state.bg){
     ctx.globalAlpha = 1;
     ctx.drawImage(state.bg, 0, 0);
@@ -549,16 +556,14 @@ function draw(){
 
     let ok = true;
     if(state.mode === "SIM"){
-      const curP = state.lvl[p] || 0;
-      const prereq = curP >= pn.max;
+      // ✅ 라인은 child 기준으로: 선행(모든 부모) + 배타(택1)
+      const prereq = prereqOk(c);
 
-      // ✅ 배타(택1) 검사: parent p 기준으로 child cn.id가 배타로 막히는지
       let excl = true;
-      const g = getExclusiveGroup(p, cn.id);
+      const g = getExclusiveGroup(p, c);
       if(g){
-        excl = !otherChosenInGroup(g, cn.id);
+        excl = !otherChosenInGroup(g, c);
       }
-
       ok = prereq && excl;
     }
 
@@ -575,12 +580,10 @@ function draw(){
   state.nodes.forEach(n=>{
     const cur = state.lvl[n.id] || 0;
 
-    // 기본 노드
     ctx.globalAlpha = nodeAlpha;
     ctx.beginPath();
     ctx.arc(n.x, n.y, n.r, 0, Math.PI*2);
 
-    // EDIT에서 클릭/지정 상태가 잘 보이도록 내부 살짝 차이
     let fill = "#0c1220";
     if(state.mode === "EDIT" && !state.viewerMode){
       if(n.id === state.selected) fill = "#101a2e";
@@ -588,7 +591,6 @@ function draw(){
     ctx.fillStyle = fill;
     ctx.fill();
 
-    // ✅ 링 색상 규칙 (EDIT에서만 강조)
     let stroke = "rgba(120,185,255,0.95)";
     let lw = 2;
 
@@ -597,16 +599,15 @@ function draw(){
       const isP = isIn(state.parents, n.id);
       const isC = isIn(state.children, n.id);
 
-      if(isP) { stroke = "rgba(124,255,107,0.98)"; lw = 3; }          // 부모: 초록
-      if(isC) { stroke = "rgba(190,120,255,0.98)"; lw = 3; }          // 자식: 보라
-      if(sel) { stroke = "rgba(255,230,120,0.98)"; lw = 4; }          // 선택: 노랑(최우선)
+      if(isP) { stroke = "rgba(124,255,107,0.98)"; lw = 3; }
+      if(isC) { stroke = "rgba(190,120,255,0.98)"; lw = 3; }
+      if(sel) { stroke = "rgba(255,230,120,0.98)"; lw = 4; }
     }
 
     ctx.strokeStyle = stroke;
     ctx.lineWidth = lw;
     ctx.stroke();
 
-    // 숫자
     const isMaxed = n.max > 0 && cur >= n.max;
 
     ctx.globalAlpha = 1;
@@ -647,6 +648,7 @@ function startPan(sx, sy){
   state.panning = true;
   state.panStart = { sx, sy, tx: state.tx, ty: state.ty };
 }
+
 function stopAllDrag(){
   state.draggingNode = false;
   state.dragNode = null;
@@ -665,7 +667,7 @@ cv.addEventListener("mousedown", (e)=>{
   if(node){
     state.selected = node.id;
 
-    // EDIT(잠금해제)에서만 노드 드래그
+    // EDIT에서만 노드 드래그
     if(state.mode === "EDIT" && !state.viewerMode){
       if(e.button === 0){
         state.draggingNode = true;
@@ -674,7 +676,7 @@ cv.addEventListener("mousedown", (e)=>{
         state.dragOff.y = w.y - node.y;
       }
     }else{
-      // SIM 포인트 조작 (+ 배타/선행/포인트 체크)
+      // SIM 포인트 조작 (+ 선행 AND + 배타)
       if(e.button === 0){
         const check = canIncrease(node.id);
         if(check.ok){
@@ -722,7 +724,7 @@ cv.addEventListener("mousemove",(e)=>{
     return;
   }
 
-  // 클릭(노드 추가) vs 드래그(화면 이동) 구분
+  // 클릭(노드 추가) vs 드래그(화면 이동)
   if(state.pendingAdd){
     const dx = sx - state.pendingAdd.sx;
     const dy = sy - state.pendingAdd.sy;
@@ -828,7 +830,7 @@ els.saveLink.addEventListener("click", ()=>{
     return;
   }
   saveToHash();
-  alert("링크 저장 완료! 주소창 링크를 공유하면 배경/노드/라인/포인트(및 배타 규칙)까지 같이 보입니다.");
+  alert("링크 저장 완료! 주소창 링크를 공유하면 배경/노드/라인/포인트/배타규칙이 같이 보입니다.");
 });
 
 // 줌 버튼
@@ -852,7 +854,7 @@ els.bgUrlInput.addEventListener("change", ()=>{
   if(url) loadBgFromUrl(url, false);
 });
 
-// 로컬 파일(편집자용)
+// 로컬 파일
 els.bgFile.addEventListener("change", (e)=>{
   if(state.viewerMode){
     alert("공유(뷰어) 모드에서는 배경 업로드가 막혀있습니다. EDIT(관리자)로 잠금 해제하세요.");
@@ -887,7 +889,7 @@ els.clearAll.addEventListener("click", ()=>{
   state.selected = null;
   state.parents = [];
   state.children = [];
-  state.exclusives = []; // ✅ 추가
+  state.exclusives = [];
   draw();
 });
 
@@ -928,11 +930,10 @@ els.applyNode.addEventListener("click", ()=>{
     state.lvl[newId] = state.lvl[oldId] || 0;
     delete state.lvl[oldId];
 
-    // ✅ 다중 목록도 같이 치환
     state.parents = state.parents.map(x=>x===oldId?newId:x);
     state.children = state.children.map(x=>x===oldId?newId:x);
 
-    // ✅ 배타 그룹도 같이 치환
+    // 배타 치환
     state.exclusives = state.exclusives.map(g=>{
       const parent = (g.parent===oldId) ? newId : g.parent;
       const group = (g.group||[]).map(id=>id===oldId?newId:id);
@@ -958,19 +959,16 @@ els.delNode.addEventListener("click", ()=>{
   state.parents = state.parents.filter(x=>x!==id);
   state.children = state.children.filter(x=>x!==id);
 
-  // ✅ 배타 그룹에서도 제거 + 비어있으면 그룹 삭제
+  // 배타에서도 제거 + 그룹 정리
   state.exclusives = state.exclusives
-    .map(g => ({
-      parent: g.parent,
-      group: (g.group||[]).filter(x=>x!==id)
-    }))
+    .map(g => ({ parent: g.parent, group: (g.group||[]).filter(x=>x!==id) }))
     .filter(g => g.parent !== id && (g.group||[]).length >= 2);
 
   state.selected=null;
   draw();
 });
 
-// ✅ 다중 부모/자식 토글
+// 부모/자식 토글
 els.setParent.addEventListener("click", ()=>{
   if(state.viewerMode) return;
   if(!state.selected) return;
@@ -984,7 +982,7 @@ els.setChild.addEventListener("click", ()=>{
   draw();
 });
 
-// 연결 추가/제거: 부모목록 × 자식목록
+// 연결 추가/제거
 els.addEdge.addEventListener("click", ()=>{
   if(state.viewerMode) return;
   if(!state.parents.length || !state.children.length){
@@ -1034,7 +1032,7 @@ els.clearChild.addEventListener("click", ()=>{
   draw();
 });
 
-// ✅ 추가: 배타(택1) 설정
+// ✅ 배타(택1) 설정
 els.setExclusive.addEventListener("click", ()=>{
   if(state.viewerMode) return;
   if(!state.parents.length || !state.children.length){
@@ -1045,17 +1043,14 @@ els.setExclusive.addEventListener("click", ()=>{
   for(const p of state.parents){
     const group = [...new Set(state.children)].filter(id=>id !== p);
 
-    // parent 동일 + group 동일이면 중복 방지
     const exists = state.exclusives.some(g =>
       g.parent===p &&
       (g.group||[]).length===group.length &&
       (g.group||[]).every(id=>group.includes(id))
     );
 
-    if(!exists){
-      if(group.length >= 2){
-        state.exclusives.push({ parent: p, group });
-      }
+    if(!exists && group.length >= 2){
+      state.exclusives.push({ parent: p, group });
     }
   }
 
@@ -1063,7 +1058,6 @@ els.setExclusive.addEventListener("click", ()=>{
   draw();
 });
 
-// ✅ 추가: 배타 그룹 전체 삭제
 els.clearExclusive.addEventListener("click", ()=>{
   if(state.viewerMode) return;
   if(!confirm("배타(택1) 그룹을 전부 삭제할까?")) return;
@@ -1081,6 +1075,7 @@ els.copyJson.addEventListener("click", async ()=>{
     alert("복사 실패. JSON 박스에서 직접 복사해줘.");
   }
 });
+
 els.loadJson.addEventListener("click", ()=>{
   if(state.viewerMode) return;
   try{
