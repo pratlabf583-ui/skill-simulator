@@ -137,6 +137,12 @@ canvas{width:100%;height:100%;display:block;}
 
     <div class="muted" style="margin-top:8px">최대(1/1의 뒤 숫자)</div>
     <input id="nodeMax" type="number" min="1" value="1">
+    <div class="muted" style="margin-top:8px">선행조건 모드</div>
+<select id="prereqMode" style="width:100%">
+  <option value="ALL">ALL (부모 전부 max 필요)</option>
+  <option value="ANY">ANY (부모 중 하나만 max면 OK)</option>
+</select>
+<div class="muted small">※ 이 설정은 ‘선택한 노드’가 부모를 가질 때만 의미가 있어.</div>
 
     <div class="row" style="margin-top:10px">
       <button id="applyNode" class="btnWide">노드 정보 적용</button>
@@ -286,6 +292,7 @@ const els = {
   json: document.getElementById("json"),
   copyJson: document.getElementById("copyJson"),
   loadJson: document.getElementById("loadJson"),
+  prereqMode: document.getElementById("prereqMode"),
 };
 
 function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
@@ -327,6 +334,8 @@ function updateRightPanel(){
   if(n){
     els.nodeId.value = n.id;
     els.nodeMax.value = n.max;
+    if(els.prereqMode) els.prereqMode.value = n.prereqMode || "ALL";
+
     els.nodeSize.value = n.r;
     els.nodeSizeLabel.textContent = String(n.r);
   }else{
@@ -370,6 +379,11 @@ function syncJsonBox(){
 function applyPack(obj){
   state.owned = Number(obj.owned ?? state.owned);
   state.nodes = Array.isArray(obj.nodes) ? obj.nodes : [];
+  // ✅ 구버전 데이터 호환: prereqMode 없으면 ALL로 보정
+state.nodes.forEach(n=>{
+  if(!n.prereqMode) n.prereqMode = "ALL";
+});
+
   state.edges = Array.isArray(obj.edges) ? obj.edges : [];
   state.lvl = (obj.lvl && typeof obj.lvl==="object") ? obj.lvl : {};
 
@@ -504,8 +518,24 @@ function descendantsOf(rootId){
 }
 
 function prereqOk(childId){
-  // 부모가 여러 개면 "전부" max 달성해야 true (AND)
   const ps = parentsOf(childId);
+  if(ps.length === 0) return true;
+
+  const child = state.nodes.find(n=>n.id===childId);
+  const mode = (child && child.prereqMode) ? child.prereqMode : "ALL";
+
+  if(mode === "ANY"){
+    // 부모 중 하나만 max면 OK
+    for(const p of ps){
+      const pn = state.nodes.find(n=>n.id===p);
+      if(!pn) continue;
+      const cur = state.lvl[p] || 0;
+      if(cur >= pn.max) return true;
+    }
+    return false;
+  }
+
+  // 기본: ALL (부모 전부 max 필요)
   for(const p of ps){
     const pn = state.nodes.find(n=>n.id===p);
     if(!pn) continue;
@@ -514,6 +544,7 @@ function prereqOk(childId){
   }
   return true;
 }
+
 
 function getExclusiveGroup(parentId, childId){
   return state.exclusives.find(g => g && g.parent===parentId && Array.isArray(g.group) && g.group.includes(childId)) || null;
@@ -539,7 +570,16 @@ function canIncrease(childId){
   if(!n) return { ok:false, msg:"노드 없음" };
 
   // 선행(모든 부모 max)
-  if(!prereqOk(childId)) return { ok:false, msg:"선행(부모) 조건 미충족 (부모 전부 max 필요)" };
+  if(!prereqOk(childId)){
+  const childNode = state.nodes.find(x=>x.id===childId);
+  const mode = (childNode && childNode.prereqMode) ? childNode.prereqMode : "ALL";
+  const hint = (mode === "ANY")
+    ? "선행(부모) 조건 미충족 (부모 중 1개 이상 max 필요)"
+    : "선행(부모) 조건 미충족 (부모 전부 max 필요)";
+  return { ok:false, msg: hint };
+}
+
+
 
   // 배타(택1)
   if(!exclusiveOk(childId)) return { ok:false, msg:"같은 분기(택1) 라인이 이미 선택됨" };
@@ -812,7 +852,7 @@ cv.addEventListener("mouseup", ()=>{
   if(state.pendingAdd && state.mode === "EDIT" && !state.viewerMode){
     const { wx, wy } = state.pendingAdd;
     const id = `N${String(state.nodes.length+1).padStart(3,"0")}`;
-    state.nodes.push({ id, x: wx, y: wy, max: 1, r: 22 });
+    state.nodes.push({ id, x: wx, y: wy, max: 1, r: 22, prereqMode: "ALL" });
     state.lvl[id] = 0;
     state.selected = id;
   }
@@ -1005,6 +1045,8 @@ els.applyNode.addEventListener("click", ()=>{
   }
 
   n.max = newMax;
+  if(els.prereqMode) n.prereqMode = els.prereqMode.value || "ALL";
+
   draw();
 });
 
@@ -1167,3 +1209,4 @@ draw();
 </script>
 </body>
 </html>
+
