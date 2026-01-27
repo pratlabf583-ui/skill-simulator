@@ -1,0 +1,908 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>전승 노드 맵퍼 + 시뮬레이터</title>
+<style>
+:root{
+  --bg:#0b0f17; --card:#121a27; --text:#e8eefc;
+  --muted:#9bb0d0; --line:#23324a; --danger:#ff4d4d;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;}
+.wrap{max-width:1900px;margin:0 auto;padding:16px;}
+.card{background:var(--card);border:1px solid var(--line);
+  border-radius:14px;padding:14px;}
+.top{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-start;}
+.kpi{font-size:18px;font-weight:900;}
+.muted{color:var(--muted);font-size:13px;}
+button,input,textarea{
+  background:#0f1624;color:var(--text);
+  border:1px solid var(--line);border-radius:10px;padding:8px 12px;
+}
+button:hover{border-color:#3a527a;cursor:pointer;}
+textarea{width:100%;height:280px;padding:10px;font-family:ui-monospace,Consolas,monospace;}
+.grid{display:grid;grid-template-columns: 1fr 420px;gap:12px;}
+.stage{position:relative;width:100%;height:2400px;border-radius:14px;
+  overflow:hidden;background:#0a0f18;border:1px solid var(--line);}
+canvas{width:100%;height:100%;display:block;}
+.toolbar{position:absolute;top:12px;left:12px;display:flex;gap:8px;z-index:10;flex-wrap:wrap;align-items:center;}
+.hint{position:absolute;bottom:10px;left:12px;font-size:12px;color:var(--muted);
+  background:rgba(0,0,0,.45);padding:6px 8px;border-radius:10px;}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.hr{border-top:1px solid var(--line);margin:12px 0}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;
+  border:1px solid var(--line);background:#0f1624;color:var(--muted);font-size:12px}
+.small{font-size:12px}
+.btnWide{width:100%}
+
+/* 공유(뷰어) 모드에서 편집 UI 숨김 */
+.viewerOnlyHide{display:none !important;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="top">
+  <div class="card" style="flex:1;min-width:780px">
+    <div class="row" style="justify-content:space-between">
+      <div>
+        <div class="kpi">전승 노드 맵퍼 + 시뮬레이터</div>
+        <div class="muted" id="subtitle">EDIT에서 배경/노드/라인 배치 → 링크 저장 → 공유자는 SIM만</div>
+      </div>
+      <span class="badge" id="modeBadge">EDIT</span>
+    </div>
+
+    <div class="row" style="gap:18px;margin-top:10px">
+      <div>
+        <div class="muted">시즌 최대(고정)</div>
+        <div class="kpi" id="seasonMax">162</div>
+      </div>
+
+      <div>
+        <div class="muted">현재 보유(입력)</div>
+        <input id="ownedSp" type="number" min="0" max="162" value="145" style="width:140px">
+        <div class="muted small">0 ~ 162</div>
+      </div>
+
+      <div>
+        <div class="muted">사용 / 남은</div>
+        <div class="kpi"><span id="used">0</span> / <span id="left">145</span></div>
+        <div class="muted small">남은 = 보유 - 사용</div>
+      </div>
+
+      <div id="status" class="muted"></div>
+    </div>
+  </div>
+
+  <div class="card" style="min-width:420px">
+    <div class="row" style="justify-content:flex-end">
+      <button id="toggleMode">시뮬레이터 보기</button>
+      <button id="adminEdit">EDIT(관리자)</button>
+      <button id="saveLink">링크 저장</button>
+      <button id="resetPoints">포인트 초기화</button>
+    </div>
+    <div class="muted small" id="shareInfo" style="margin-top:6px"></div>
+  </div>
+</div>
+
+<div class="grid" id="gridRoot">
+
+  <div class="card">
+    <div class="stage" id="stage">
+      <div class="toolbar">
+        <!-- ✅ 배경: URL 방식 + 로컬 파일(편집자만) -->
+        <input id="bgUrlInput" class="editUI" placeholder="배경 이미지 URL 붙여넣기 (공유용)" style="width:320px">
+        <input id="bgFile" class="editUI" type="file" accept="image/*">
+
+        <button id="zoomIn">+</button>
+        <button id="zoomOut">-</button>
+        <button id="resetView">뷰 리셋</button>
+
+        <button id="clearAll" class="editUI">노드/라인 전체삭제</button>
+
+        <div class="editUI" style="padding:6px 10px;border:1px solid var(--line);border-radius:10px;min-width:240px">
+          <div class="muted">선택 노드 크기: <b id="nodeSizeLabel">22</b></div>
+          <input id="nodeSize" type="range" min="14" max="60" value="22" style="width:220px">
+        </div>
+
+        <div style="padding:6px 10px;border:1px solid var(--line);border-radius:10px;min-width:260px">
+          <div class="muted">전체 숫자 크기: <b id="labelSizeLabel">18</b></div>
+          <input id="labelSize" type="range" min="10" max="34" value="18" style="width:240px">
+        </div>
+
+        <span class="badge">휠: 확대/축소 · 빈곳 드래그: 화면이동</span>
+      </div>
+
+      <canvas id="cv"></canvas>
+
+      <div class="hint" id="hint">
+        EDIT: 빈곳 클릭=노드추가 / 노드 드래그=이동 / 빈곳 드래그=화면이동<br>
+        SIM: 노드 좌클릭 +1 / 우클릭 -1 / 빈곳 드래그=화면이동<br>
+        빨간 라인: 부모 노드가 최대치 미달(선행 조건 미충족)<br>
+        형광 숫자: 노드가 최대치 달성(예: 1/1, 5/5)
+      </div>
+    </div>
+  </div>
+
+  <!-- ✅ 오른쪽 패널: 편집 전용, 공유자는 숨김 -->
+  <div class="card editUI" id="rightPanel">
+    <div class="kpi" style="margin-bottom:6px">선택한 노드</div>
+    <div class="muted" id="selText">없음</div>
+
+    <div class="hr"></div>
+
+    <div class="muted">노드 ID</div>
+    <input id="nodeId" placeholder="예: N001">
+
+    <div class="muted" style="margin-top:8px">최대(1/1의 뒤 숫자)</div>
+    <input id="nodeMax" type="number" min="1" value="1">
+
+    <div class="row" style="margin-top:10px">
+      <button id="applyNode" class="btnWide">노드 정보 적용</button>
+      <button id="delNode" class="btnWide">노드 삭제</button>
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="kpi" style="font-size:16px">라인 연결</div>
+    <div class="muted small" style="margin:6px 0">
+      1) 노드 클릭 → “부모로 지정”<br>
+      2) 다른 노드 클릭 → “자식으로 지정”<br>
+      3) “연결 추가” (부모→자식)
+    </div>
+
+    <div class="row">
+      <button id="setParent" class="btnWide">부모로 지정</button>
+      <button id="setChild" class="btnWide">자식으로 지정</button>
+    </div>
+
+    <div class="row" style="margin-top:8px">
+      <button id="addEdge" class="btnWide">연결 추가</button>
+      <button id="removeEdge" class="btnWide">연결 제거</button>
+    </div>
+
+    <div class="muted small" id="pcInfo" style="margin-top:8px"></div>
+
+    <div class="hr"></div>
+
+    <div class="kpi" style="font-size:16px">내보내기/가져오기</div>
+    <div class="muted small">완료되면 JSON을 복사해도 되고, 링크 저장으로 공유해도 됨</div>
+
+    <textarea id="json" spellcheck="false"></textarea>
+
+    <div class="row" style="margin-top:8px">
+      <button id="copyJson" class="btnWide">JSON 복사</button>
+      <button id="loadJson" class="btnWide">JSON 불러오기(붙여넣기)</button>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+/** =========================
+ *  ✅ 관리자 비밀번호
+ *  ========================= */
+const ADMIN_PASSWORD = "1234";
+
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+const stage = document.getElementById("stage");
+
+const state = {
+  seasonMax: 162,
+  mode: "EDIT",
+  owned: 145,
+  nodes: [],
+  edges: [],
+  lvl: {},
+  selected: null,
+  parent: null,
+  child: null,
+
+  bg: null,
+  bgUrl: null,
+
+  scale: 1,
+  tx: 0,
+  ty: 0,
+
+  draggingNode: false,
+  dragNode: null,
+  dragOff: {x:0,y:0},
+
+  panning: false,
+  panStart: {sx:0, sy:0, tx:0, ty:0},
+
+  pendingAdd: null,
+
+  labelFontSize: 18,
+
+  viewerMode: false,     // 공유자 SIM전용
+  adminUnlocked: false,  // 비번 맞으면 편집 UI 표시
+};
+
+const els = {
+  subtitle: document.getElementById("subtitle"),
+  modeBadge: document.getElementById("modeBadge"),
+  ownedSp: document.getElementById("ownedSp"),
+  used: document.getElementById("used"),
+  left: document.getElementById("left"),
+  status: document.getElementById("status"),
+  toggleMode: document.getElementById("toggleMode"),
+  adminEdit: document.getElementById("adminEdit"),
+  resetPoints: document.getElementById("resetPoints"),
+  saveLink: document.getElementById("saveLink"),
+  shareInfo: document.getElementById("shareInfo"),
+
+  bgUrlInput: document.getElementById("bgUrlInput"),
+  bgFile: document.getElementById("bgFile"),
+
+  zoomIn: document.getElementById("zoomIn"),
+  zoomOut: document.getElementById("zoomOut"),
+  resetView: document.getElementById("resetView"),
+  clearAll: document.getElementById("clearAll"),
+
+  nodeSize: document.getElementById("nodeSize"),
+  nodeSizeLabel: document.getElementById("nodeSizeLabel"),
+
+  labelSize: document.getElementById("labelSize"),
+  labelSizeLabel: document.getElementById("labelSizeLabel"),
+
+  selText: document.getElementById("selText"),
+  nodeId: document.getElementById("nodeId"),
+  nodeMax: document.getElementById("nodeMax"),
+  applyNode: document.getElementById("applyNode"),
+  delNode: document.getElementById("delNode"),
+  setParent: document.getElementById("setParent"),
+  setChild: document.getElementById("setChild"),
+  addEdge: document.getElementById("addEdge"),
+  removeEdge: document.getElementById("removeEdge"),
+  pcInfo: document.getElementById("pcInfo"),
+
+  json: document.getElementById("json"),
+  copyJson: document.getElementById("copyJson"),
+  loadJson: document.getElementById("loadJson"),
+};
+
+function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+
+function resize(){
+  const r = stage.getBoundingClientRect();
+  cv.width = r.width * devicePixelRatio;
+  cv.height = r.height * devicePixelRatio;
+  draw();
+}
+window.addEventListener("resize", resize);
+
+function screenToWorld(sx, sy){
+  return { x: (sx - state.tx) / state.scale, y: (sy - state.ty) / state.scale };
+}
+function getUsed(){
+  return Object.values(state.lvl).reduce((a,b)=>a+b,0);
+}
+
+function updateTop(){
+  const used = getUsed();
+  els.used.textContent = used;
+  els.left.textContent = state.owned - used;
+  els.modeBadge.textContent = state.viewerMode ? "SIM(공유)" : state.mode;
+  els.toggleMode.textContent = (state.mode === "SIM") ? "편집기 보기" : "시뮬레이터 보기";
+
+  const ok = used <= state.owned;
+  els.status.innerHTML = ok
+    ? `✅ 보유 ${state.owned}P 중 ${used}P 사용`
+    : `❌ 보유 ${state.owned}P 초과 사용 (${used - state.owned}P)`;
+  els.status.style.color = ok ? "#9bb0d0" : "#ff6b6b";
+}
+
+function updateRightPanel(){
+  const n = state.nodes.find(x=>x.id===state.selected);
+  els.selText.textContent = n ? n.id : "없음";
+
+  if(n){
+    els.nodeId.value = n.id;
+    els.nodeMax.value = n.max;
+    els.nodeSize.value = n.r;
+    els.nodeSizeLabel.textContent = String(n.r);
+  }else{
+    els.nodeId.value = "";
+    els.nodeMax.value = 1;
+  }
+  els.pcInfo.textContent = `부모: ${state.parent ?? "-"} / 자식: ${state.child ?? "-"}`;
+}
+
+function pack(){
+  return {
+    seasonMax: state.seasonMax,
+    owned: state.owned,
+    nodes: state.nodes,
+    edges: state.edges,
+    lvl: state.lvl,
+    view: { scale: state.scale, tx: state.tx, ty: state.ty },
+    ui: { labelFontSize: state.labelFontSize },
+    bgUrl: state.bgUrl, // ✅ 배경 URL은 공유를 위해 저장
+  };
+}
+
+function syncJsonBox(){
+  if(state.viewerMode) return;
+  els.json.value = JSON.stringify(pack(), null, 2);
+}
+
+function applyPack(obj){
+  state.owned = Number(obj.owned ?? state.owned);
+  state.nodes = Array.isArray(obj.nodes) ? obj.nodes : [];
+  state.edges = Array.isArray(obj.edges) ? obj.edges : [];
+  state.lvl = (obj.lvl && typeof obj.lvl==="object") ? obj.lvl : {};
+
+  if(obj.view){
+    state.scale = Number(obj.view.scale ?? state.scale);
+    state.tx = Number(obj.view.tx ?? state.tx);
+    state.ty = Number(obj.view.ty ?? state.ty);
+  }
+
+  if(obj.ui && typeof obj.ui.labelFontSize === "number"){
+    state.labelFontSize = clamp(obj.ui.labelFontSize, 10, 34);
+    els.labelSize.value = String(state.labelFontSize);
+    els.labelSizeLabel.textContent = String(state.labelFontSize);
+  }
+
+  if(typeof obj.bgUrl === "string" && obj.bgUrl.trim()){
+    loadBgFromUrl(obj.bgUrl.trim(), false);
+  }
+
+  state.selected = null;
+  state.parent = null;
+  state.child = null;
+}
+
+function saveToHash(){
+  const str = JSON.stringify(pack());
+  const b64 = btoa(unescape(encodeURIComponent(str)));
+  location.hash = b64;
+}
+
+function loadFromHash(){
+  try{
+    const h = location.hash.replace("#","");
+    if(!h) return false;
+    const str = decodeURIComponent(escape(atob(h)));
+    const obj = JSON.parse(str);
+    applyPack(obj);
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+/** ✅ 뷰어모드: 편집 UI 숨김 + SIM 고정 */
+function setViewerMode(on){
+  state.viewerMode = on;
+
+  document.querySelectorAll(".editUI").forEach(el=>{
+    el.classList.toggle("viewerOnlyHide", on);
+  });
+
+  const grid = document.getElementById("gridRoot");
+  grid.style.gridTemplateColumns = on ? "1fr" : "1fr 420px";
+
+  if(on){
+    els.subtitle.textContent = "공유용 SIM 화면 (편집 기능 숨김)";
+    els.shareInfo.textContent = "공유 링크는 SIM 전용입니다. (편집은 EDIT(관리자) 비번 필요)";
+    state.mode = "SIM";
+  }else{
+    els.subtitle.textContent = "EDIT에서 배경/노드/라인 배치 → 링크 저장 → 공유자는 SIM만";
+    els.shareInfo.textContent = "";
+  }
+
+  draw();
+}
+
+/** ✅ 배경 URL 로드 (blob:은 공유 불가) */
+function loadBgFromUrl(url, alsoSetInput=true){
+  if(!url) return;
+
+  // blob: URL은 다른 사람에게 절대 공유 안됨
+  if(url.startsWith("blob:")){
+    alert("⚠️ blob: 로 시작하는 URL은 내 PC에서만 보이고 공유가 불가능해.\n이미지를 웹에 올린 뒤(디스코드/이미지호스팅) https URL을 넣어줘.");
+  }
+
+  const img = new Image();
+  img.crossOrigin = "anonymous"; // 가능한 경우
+  img.onload = ()=>{
+    state.bg = img;
+    state.bgUrl = url;
+
+    // 화면 가로에 맞춤
+    state.scale = stage.clientWidth / img.width;
+    state.tx = 0;
+    state.ty = 0;
+
+    if(alsoSetInput && !state.viewerMode){
+      els.bgUrlInput.value = url;
+    }
+    draw();
+  };
+  img.onerror = ()=>{
+    alert("배경 이미지 URL 로드 실패!\n- URL이 직접 이미지(.png/.jpg)로 열리는지 확인\n- 권한 제한(로그인 필요) URL이면 안됨");
+  };
+  img.src = url;
+}
+
+function draw(){
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,cv.width,cv.height);
+
+  ctx.setTransform(
+    state.scale*devicePixelRatio,0,0,
+    state.scale*devicePixelRatio,
+    state.tx*devicePixelRatio,
+    state.ty*devicePixelRatio
+  );
+
+  // 배경은 항상 선명
+  if(state.bg){
+    ctx.globalAlpha = 1;
+    ctx.drawImage(state.bg, 0, 0);
+  }
+
+  const lineAlpha = (state.mode === "SIM") ? 0.55 : 1;
+  const nodeAlpha = (state.mode === "SIM") ? 0.45 : 1;
+
+  // 라인
+  state.edges.forEach(([p,c])=>{
+    const pn = state.nodes.find(n=>n.id===p);
+    const cn = state.nodes.find(n=>n.id===c);
+    if(!pn||!cn) return;
+
+    // SIM에서만 선행 체크
+    let ok = true;
+    if(state.mode === "SIM"){
+      const cur = state.lvl[p] || 0;
+      ok = cur >= pn.max;
+    }
+
+    ctx.globalAlpha = lineAlpha;
+    ctx.strokeStyle = ok ? "rgba(120,185,255,0.95)" : "rgba(255,77,77,0.95)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(pn.x, pn.y);
+    ctx.lineTo(cn.x, cn.y);
+    ctx.stroke();
+  });
+
+  // 노드 + 숫자
+  state.nodes.forEach(n=>{
+    const cur = state.lvl[n.id] || 0;
+
+    ctx.globalAlpha = nodeAlpha;
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, n.r, 0, Math.PI*2);
+    ctx.fillStyle = "#0c1220";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(120,185,255,0.95)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    const isMaxed = n.max > 0 && cur >= n.max;
+
+    ctx.globalAlpha = 1;
+    ctx.textAlign = "center";
+    ctx.font = `900 ${state.labelFontSize}px sans-serif`;
+
+    if(isMaxed){
+      ctx.fillStyle = "#7CFF6B";
+      ctx.shadowColor = "rgba(124,255,107,0.9)";
+      ctx.shadowBlur = 12;
+    }else{
+      ctx.fillStyle = "#ffffff";
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
+    }
+
+    const y = n.y + n.r + (state.labelFontSize + 6);
+    ctx.fillText(`${cur}/${n.max}`, n.x, y);
+
+    ctx.shadowColor = "transparent";
+    ctx.shadowBlur = 0;
+  });
+
+  updateTop();
+  if(!state.viewerMode) updateRightPanel();
+  syncJsonBox();
+}
+
+function hitNode(w){
+  for(let i=state.nodes.length-1;i>=0;i--){
+    const n = state.nodes[i];
+    if(Math.hypot(n.x-w.x, n.y-w.y) < n.r + 6) return n;
+  }
+  return null;
+}
+
+function startPan(sx, sy){
+  state.panning = true;
+  state.panStart = { sx, sy, tx: state.tx, ty: state.ty };
+}
+function stopAllDrag(){
+  state.draggingNode = false;
+  state.dragNode = null;
+  state.panning = false;
+  state.pendingAdd = null;
+}
+
+cv.addEventListener("mousedown", (e)=>{
+  const rect = cv.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  const w = screenToWorld(sx, sy);
+
+  const node = hitNode(w);
+
+  if(node){
+    state.selected = node.id;
+
+    // EDIT(잠금해제)에서만 노드 드래그
+    if(state.mode === "EDIT" && !state.viewerMode){
+      if(e.button === 0){
+        state.draggingNode = true;
+        state.dragNode = node;
+        state.dragOff.x = w.x - node.x;
+        state.dragOff.y = w.y - node.y;
+      }
+    }else{
+      // SIM 포인트 조작
+      if(e.button === 0){
+        const cur = state.lvl[node.id] || 0;
+        if(cur < node.max) state.lvl[node.id] = cur + 1;
+      }
+      if(e.button === 2){
+        const cur = state.lvl[node.id] || 0;
+        if(cur > 0) state.lvl[node.id] = cur - 1;
+      }
+    }
+
+    draw();
+    return;
+  }
+
+  // 빈 곳
+  if(e.button === 0){
+    if(state.mode === "EDIT" && !state.viewerMode){
+      state.pendingAdd = { sx, sy, wx: w.x, wy: w.y };
+    }else{
+      startPan(sx, sy);
+    }
+  }
+
+  if(state.mode === "EDIT" && e.button === 2){
+    startPan(sx, sy);
+  }
+});
+
+cv.addEventListener("mousemove",(e)=>{
+  const rect = cv.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+
+  if(state.draggingNode && state.dragNode){
+    const w = screenToWorld(sx, sy);
+    state.dragNode.x = w.x - state.dragOff.x;
+    state.dragNode.y = w.y - state.dragOff.y;
+    draw();
+    return;
+  }
+
+  // 클릭(노드 추가) vs 드래그(화면 이동) 구분
+  if(state.pendingAdd){
+    const dx = sx - state.pendingAdd.sx;
+    const dy = sy - state.pendingAdd.sy;
+    const dist = Math.hypot(dx, dy);
+    if(dist > 6){
+      const startSx = state.pendingAdd.sx;
+      const startSy = state.pendingAdd.sy;
+      state.pendingAdd = null;
+      startPan(startSx, startSy);
+    }
+  }
+
+  if(state.panning){
+    const dx = sx - state.panStart.sx;
+    const dy = sy - state.panStart.sy;
+    state.tx = state.panStart.tx + dx;
+    state.ty = state.panStart.ty + dy;
+    draw();
+  }
+});
+
+cv.addEventListener("mouseup",()=>{
+  // 빈곳 클릭 -> 노드 추가
+  if(state.pendingAdd && state.mode === "EDIT" && !state.viewerMode){
+    const { wx, wy } = state.pendingAdd;
+    const id = `N${String(state.nodes.length+1).padStart(3,"0")}`;
+    state.nodes.push({ id, x: wx, y: wy, max: 1, r: 22 });
+    state.lvl[id] = 0;
+    state.selected = id;
+  }
+  stopAllDrag();
+  draw();
+});
+
+cv.addEventListener("mouseleave", ()=>{ stopAllDrag(); draw(); });
+cv.addEventListener("contextmenu", e=>e.preventDefault());
+
+// 휠 줌
+cv.addEventListener("wheel", (e)=>{
+  e.preventDefault();
+  const rect = cv.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  const before = screenToWorld(sx, sy);
+  const zoomFactor = e.deltaY < 0 ? 1.12 : 1/1.12;
+  state.scale = clamp(state.scale * zoomFactor, 0.1, 8);
+  state.tx = sx - before.x * state.scale;
+  state.ty = sy - before.y * state.scale;
+  draw();
+}, { passive:false });
+
+// ----- UI 이벤트 -----
+els.ownedSp.addEventListener("input", ()=>{
+  const v = Number(els.ownedSp.value);
+  state.owned = Math.max(0, Math.min(state.seasonMax, isFinite(v)?v:0));
+  draw();
+});
+
+els.labelSize.addEventListener("input", ()=>{
+  state.labelFontSize = Number(els.labelSize.value);
+  els.labelSizeLabel.textContent = String(state.labelFontSize);
+  draw();
+});
+
+els.toggleMode.addEventListener("click", ()=>{
+  // 공유자는 SIM 고정
+  if(state.viewerMode){
+    state.mode = "SIM";
+    draw();
+    return;
+  }
+  state.mode = (state.mode==="EDIT") ? "SIM" : "EDIT";
+  draw();
+});
+
+// ✅ 관리자 비번: 성공하면 viewerMode 해제 + 편집 UI 복구
+els.adminEdit.addEventListener("click", ()=>{
+  if(state.adminUnlocked){
+    setViewerMode(false);
+    state.mode = "EDIT";
+    draw();
+    return;
+  }
+  const input = prompt("관리자 비밀번호를 입력하세요");
+  if(input === null) return;
+  if(input !== ADMIN_PASSWORD){
+    alert("비밀번호가 틀렸습니다.");
+    return;
+  }
+  state.adminUnlocked = true;
+  setViewerMode(false);
+  state.mode = "EDIT";
+  alert("편집 잠금 해제 완료!");
+  draw();
+});
+
+els.resetPoints.addEventListener("click", ()=>{
+  Object.keys(state.lvl).forEach(k=>state.lvl[k]=0);
+  draw();
+});
+
+els.saveLink.addEventListener("click", ()=>{
+  // ✅ 공유 전에 blob URL이면 경고
+  if(state.bgUrl && state.bgUrl.startsWith("blob:")){
+    alert("⚠️ 지금 배경은 로컬 파일(blob:)이라서 공유하면 다른 사람은 못 봅니다.\n배경 URL 입력칸에 https 이미지 URL을 넣어주세요.");
+    return;
+  }
+  saveToHash();
+  alert("링크 저장 완료! 주소창 링크를 공유하면 배경/노드/라인/포인트가 같이 보입니다.");
+});
+
+// 줌 버튼
+function zoomAtCenter(factor){
+  const rect = cv.getBoundingClientRect();
+  const sx = rect.width/2, sy = rect.height/2;
+  const before = screenToWorld(sx, sy);
+  state.scale = clamp(state.scale * factor, 0.1, 8);
+  state.tx = sx - before.x * state.scale;
+  state.ty = sy - before.y * state.scale;
+  draw();
+}
+els.zoomIn.addEventListener("click", ()=>zoomAtCenter(1.15));
+els.zoomOut.addEventListener("click", ()=>zoomAtCenter(1/1.15));
+els.resetView.addEventListener("click", ()=>{ state.scale=1; state.tx=0; state.ty=0; draw(); });
+
+// 배경 URL
+els.bgUrlInput.addEventListener("change", ()=>{
+  if(state.viewerMode) return;
+  const url = els.bgUrlInput.value.trim();
+  if(url) loadBgFromUrl(url, false);
+});
+
+// 로컬 파일(편집자용) — 공유용은 반드시 https URL로 바꿔야 함
+els.bgFile.addEventListener("change", (e)=>{
+  if(state.viewerMode){
+    alert("공유(뷰어) 모드에서는 배경 업로드가 막혀있습니다. EDIT(관리자)로 잠금 해제하세요.");
+    e.target.value = "";
+    return;
+  }
+  const f = e.target.files?.[0];
+  if(!f) return;
+
+  const img = new Image();
+  img.onload = ()=>{
+    state.bg = img;
+    // ⚠️ blob URL은 공유 불가라 저장용 bgUrl로는 넣지 않음
+    state.bgUrl = null;
+
+    state.scale = stage.clientWidth / img.width;
+    state.tx = 0;
+    state.ty = 0;
+
+    alert("로컬 파일 배경 적용 완료!\n공유하려면 배경 URL 입력칸에 https 이미지 URL을 넣어야 다른 사람도 보입니다.");
+    draw();
+  };
+  img.src = URL.createObjectURL(f);
+});
+
+// 전체 삭제
+els.clearAll.addEventListener("click", ()=>{
+  if(state.viewerMode) return;
+  if(!confirm("노드/라인을 전부 삭제할까?")) return;
+  state.nodes = [];
+  state.edges = [];
+  state.lvl = {};
+  state.selected = null;
+  state.parent = null;
+  state.child = null;
+  draw();
+});
+
+// 선택 노드 크기
+els.nodeSize.addEventListener("input", ()=>{
+  if(state.viewerMode) return;
+  if(!state.selected) return;
+  const n = state.nodes.find(x=>x.id===state.selected);
+  if(!n) return;
+  n.r = Number(els.nodeSize.value);
+  els.nodeSizeLabel.textContent = String(n.r);
+  draw();
+});
+
+// 노드 정보 적용
+els.applyNode.addEventListener("click", ()=>{
+  if(state.viewerMode) return;
+  if(!state.selected) return;
+  const n = state.nodes.find(x=>x.id===state.selected);
+  if(!n) return;
+
+  const newId = (els.nodeId.value || n.id).trim();
+  const newMax = Math.max(1, Number(els.nodeMax.value) || 1);
+
+  if(newId !== n.id){
+    const oldId = n.id;
+    if(state.nodes.some(x=>x.id===newId)){
+      alert("이미 존재하는 노드 ID입니다.");
+      return;
+    }
+    n.id = newId;
+
+    state.edges = state.edges.map(([p,c])=>[
+      p===oldId ? newId : p,
+      c===oldId ? newId : c
+    ]);
+
+    state.lvl[newId] = state.lvl[oldId] || 0;
+    delete state.lvl[oldId];
+
+    if(state.selected===oldId) state.selected=newId;
+    if(state.parent===oldId) state.parent=newId;
+    if(state.child===oldId) state.child=newId;
+  }
+
+  n.max = newMax;
+  draw();
+});
+
+// 노드 삭제
+els.delNode.addEventListener("click", ()=>{
+  if(state.viewerMode) return;
+  if(!state.selected) return;
+  const id = state.selected;
+  state.nodes = state.nodes.filter(n=>n.id!==id);
+  state.edges = state.edges.filter(([p,c])=>p!==id && c!==id);
+  delete state.lvl[id];
+  if(state.parent===id) state.parent=null;
+  if(state.child===id) state.child=null;
+  state.selected=null;
+  draw();
+});
+
+els.setParent.addEventListener("click", ()=>{
+  if(state.viewerMode) return;
+  if(!state.selected) return;
+  state.parent = state.selected;
+  draw();
+});
+els.setChild.addEventListener("click", ()=>{
+  if(state.viewerMode) return;
+  if(!state.selected) return;
+  state.child = state.selected;
+  draw();
+});
+els.addEdge.addEventListener("click", ()=>{
+  if(state.viewerMode) return;
+  if(!state.parent || !state.child){
+    alert("부모/자식을 먼저 지정해줘.");
+    return;
+  }
+  if(state.parent === state.child){
+    alert("부모와 자식이 같을 수 없어.");
+    return;
+  }
+  const exists = state.edges.some(([p,c])=>p===state.parent && c===state.child);
+  if(!exists) state.edges.push([state.parent, state.child]);
+  draw();
+});
+els.removeEdge.addEventListener("click", ()=>{
+  if(state.viewerMode) return;
+  if(!state.parent || !state.child){
+    alert("부모/자식을 먼저 지정해줘.");
+    return;
+  }
+  state.edges = state.edges.filter(([p,c])=>!(p===state.parent && c===state.child));
+  draw();
+});
+
+// JSON 복사/불러오기
+els.copyJson.addEventListener("click", async ()=>{
+  if(state.viewerMode) return;
+  try{
+    await navigator.clipboard.writeText(els.json.value);
+    alert("JSON 복사 완료");
+  }catch(e){
+    alert("복사 실패. JSON 박스에서 직접 복사해줘.");
+  }
+});
+els.loadJson.addEventListener("click", ()=>{
+  if(state.viewerMode) return;
+  try{
+    const obj = JSON.parse(els.json.value);
+    applyPack(obj);
+    els.ownedSp.value = String(state.owned);
+    draw();
+    alert("불러오기 완료");
+  }catch(e){
+    alert("JSON 형식이 잘못됐어.");
+  }
+});
+
+// 초기 슬라이더
+els.labelSize.value = String(state.labelFontSize);
+els.labelSizeLabel.textContent = String(state.labelFontSize);
+
+// 시작
+resize();
+const loaded = loadFromHash();
+if(loaded){
+  // 공유 링크로 들어오면 SIM + 편집 숨김
+  setViewerMode(true);
+  state.mode = "SIM";
+}else{
+  setViewerMode(false);
+}
+draw();
+</script>
+</body>
+</html>
