@@ -324,7 +324,7 @@ function pack(){
     lvl: state.lvl,
     view: { scale: state.scale, tx: state.tx, ty: state.ty },
     ui: { labelFontSize: state.labelFontSize },
-    bgUrl: state.bgUrl,
+    bgUrl: state.bgUrl, // ✅ 배경 URL은 공유를 위해 저장
   };
 }
 
@@ -379,7 +379,10 @@ function loadFromHash(){
   }
 }
 
-/** ✅ 뷰어모드: 편집 UI 숨김 + SIM 고정 */
+/** ✅ 뷰어모드: 편집 UI 숨김 + SIM 고정
+ *  🔥 중요 수정: 레이아웃이 바뀌면 캔버스 크기/좌표계가 달라져서 "클릭이 안 되는" 현상이 생김
+ *  → setViewerMode() 마지막에 resize()를 강제로 호출해서 해결
+ */
 function setViewerMode(on){
   state.viewerMode = on;
 
@@ -399,7 +402,7 @@ function setViewerMode(on){
     els.shareInfo.textContent = "";
   }
 
-  // ✅✅ 핵심 수정: 레이아웃 바뀐 뒤 캔버스 해상도/좌표계를 다시 맞춰야 클릭 판정이 정상
+  // ✅ 레이아웃 반영 후 캔버스 리사이즈(좌표계/히트테스트 동기화)
   requestAnimationFrame(()=>resize());
 }
 
@@ -443,6 +446,7 @@ function draw(){
     state.ty*devicePixelRatio
   );
 
+  // 배경은 항상 선명
   if(state.bg){
     ctx.globalAlpha = 1;
     ctx.drawImage(state.bg, 0, 0);
@@ -451,6 +455,7 @@ function draw(){
   const lineAlpha = (state.mode === "SIM") ? 0.55 : 1;
   const nodeAlpha = (state.mode === "SIM") ? 0.45 : 1;
 
+  // 라인
   state.edges.forEach(([p,c])=>{
     const pn = state.nodes.find(n=>n.id===p);
     const cn = state.nodes.find(n=>n.id===c);
@@ -471,6 +476,7 @@ function draw(){
     ctx.stroke();
   });
 
+  // 노드 + 숫자
   state.nodes.forEach(n=>{
     const cur = state.lvl[n.id] || 0;
 
@@ -541,6 +547,7 @@ cv.addEventListener("mousedown", (e)=>{
   if(node){
     state.selected = node.id;
 
+    // EDIT(잠금해제)에서만 노드 드래그
     if(state.mode === "EDIT" && !state.viewerMode){
       if(e.button === 0){
         state.draggingNode = true;
@@ -549,6 +556,7 @@ cv.addEventListener("mousedown", (e)=>{
         state.dragOff.y = w.y - node.y;
       }
     }else{
+      // SIM 포인트 조작
       if(e.button === 0){
         const cur = state.lvl[node.id] || 0;
         if(cur < node.max) state.lvl[node.id] = cur + 1;
@@ -563,6 +571,7 @@ cv.addEventListener("mousedown", (e)=>{
     return;
   }
 
+  // 빈 곳
   if(e.button === 0){
     if(state.mode === "EDIT" && !state.viewerMode){
       state.pendingAdd = { sx, sy, wx: w.x, wy: w.y };
@@ -589,6 +598,7 @@ cv.addEventListener("mousemove",(e)=>{
     return;
   }
 
+  // 클릭(노드 추가) vs 드래그(화면 이동) 구분
   if(state.pendingAdd){
     const dx = sx - state.pendingAdd.sx;
     const dy = sy - state.pendingAdd.sy;
@@ -611,6 +621,7 @@ cv.addEventListener("mousemove",(e)=>{
 });
 
 cv.addEventListener("mouseup",()=>{
+  // 빈곳 클릭 -> 노드 추가
   if(state.pendingAdd && state.mode === "EDIT" && !state.viewerMode){
     const { wx, wy } = state.pendingAdd;
     const id = `N${String(state.nodes.length+1).padStart(3,"0")}`;
@@ -653,6 +664,7 @@ els.labelSize.addEventListener("input", ()=>{
 });
 
 els.toggleMode.addEventListener("click", ()=>{
+  // 공유자는 SIM 고정
   if(state.viewerMode){
     state.mode = "SIM";
     draw();
@@ -667,7 +679,6 @@ els.adminEdit.addEventListener("click", ()=>{
   if(state.adminUnlocked){
     setViewerMode(false);
     state.mode = "EDIT";
-    draw();
     return;
   }
   const input = prompt("관리자 비밀번호를 입력하세요");
@@ -680,7 +691,6 @@ els.adminEdit.addEventListener("click", ()=>{
   setViewerMode(false);
   state.mode = "EDIT";
   alert("편집 잠금 해제 완료!");
-  draw();
 });
 
 els.resetPoints.addEventListener("click", ()=>{
@@ -883,6 +893,7 @@ els.labelSizeLabel.textContent = String(state.labelFontSize);
 resize();
 const loaded = loadFromHash();
 if(loaded){
+  // 공유 링크로 들어오면 SIM + 편집 숨김
   setViewerMode(true);
   state.mode = "SIM";
 }else{
