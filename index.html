@@ -1210,7 +1210,10 @@ resize();
 const loaded = loadFromHash();
 if(loaded){
   setViewerMode(true);
+
+  // ✅ 공유 링크로 들어오면 무조건 SIM 강제
   state.mode = "SIM";
+  els.modeBadge.textContent = "SIM(공유)";
 }else{
   setViewerMode(false);
 }
@@ -1218,6 +1221,7 @@ draw();
 </script>
 </body>
 </html>
+
 
 
 
