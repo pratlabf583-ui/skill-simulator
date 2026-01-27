@@ -367,7 +367,11 @@ function updateTop(){
   els.used.textContent = used;
   els.left.textContent = state.owned - used;
   els.modeBadge.textContent = state.viewerMode ? "SIM(공유)" : state.mode;
-  els.toggleMode.textContent = (state.mode === "SIM") ? "편집기 보기" : "시뮬레이터 보기";
+  els.toggleMode.textContent = state.viewerMode
+  ? "시뮬레이터 보기"
+  : ((state.mode === "SIM") ? "편집기 보기" : "시뮬레이터 보기");
+
+
 
   // ✅ 핵심: 잠김 상태면 status 문구를 updateTop이 덮어쓰지 않게
   if(state.viewerMode && state.mode === "SIM" && state.simLocked){
@@ -1026,7 +1030,8 @@ els.resetPoints.addEventListener("click", ()=>{
 els.saveLinkBase.addEventListener("click", ()=>{
   saveToHash({ includeLvl: false });
 
-  const url = location.href;
+  const url = location.origin + location.pathname + location.search + location.hash;
+
   try{
     navigator.clipboard.writeText(url);
     els.shareInfo.textContent = "✅ 링크(초기화)가 복사됨";
@@ -1040,7 +1045,8 @@ els.saveLinkBase.addEventListener("click", ()=>{
 els.saveLinkBuild.addEventListener("click", ()=>{
   saveToHash({ includeLvl: true });
 
-  const url = location.href;
+  const url = location.origin + location.pathname + location.search + location.hash;
+
   try{
     navigator.clipboard.writeText(url);
     els.shareInfo.textContent = "✅ 링크(내 빌드)가 복사됨";
@@ -1324,6 +1330,7 @@ els.loadJson.addEventListener("click", ()=>{
 </script>
 </body>
 </html>
+
 
 
 
