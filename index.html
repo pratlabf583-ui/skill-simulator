@@ -479,6 +479,11 @@ function parentsOf(childId){
   return state.edges.filter(([p,c])=>c===childId).map(([p])=>p);
 }
 
+// ✅ (추가) 특정 노드가 부모인 "직접 자식" 목록
+function childrenOf(parentId){
+  return state.edges.filter(([p,c])=>p===parentId).map(([_,c])=>c);
+}
+
 function prereqOk(childId){
   // ✅ 부모가 여러 개면 "전부" max 달성해야 true (AND)
   const ps = parentsOf(childId);
@@ -524,6 +529,35 @@ function canIncrease(childId){
   if(cur >= n.max) return { ok:false, msg:"이미 최대" };
 
   if(getUsed() + 1 > state.owned) return { ok:false, msg:"보유 포인트 부족" };
+
+  return { ok:true, msg:"OK" };
+}
+
+/** =====================================
+ * ✅ (추가) SIM 우클릭 -1 제약:
+ * 자식이 하나라도 찍혀 있으면 부모를 내릴 수 없음
+ * ===================================== */
+function canDecrease(nodeId){
+  const n = state.nodes.find(x=>x.id===nodeId);
+  if(!n) return { ok:false, msg:"노드 없음" };
+
+  const cur = state.lvl[nodeId] || 0;
+  if(cur <= 0) return { ok:false, msg:"이미 0" };
+
+  const after = cur - 1;
+
+  // 이 노드가 어떤 자식들의 선행(부모)라면,
+  // 자식이 1 이상 찍혀 있는 상태에서 parent가 max 미만이 되면 불가
+  const childs = childrenOf(nodeId);
+  for(const c of childs){
+    const childCur = state.lvl[c] || 0;
+    if(childCur > 0){
+      // 자식은 이 부모가 "max"여야만 유지 가능하므로 after < max 이면 취소 불가
+      if(after < n.max){
+        return { ok:false, msg:`자식(${c})을 먼저 0으로 취소해야 부모(${nodeId})를 취소할 수 있음` };
+      }
+    }
+  }
 
   return { ok:true, msg:"OK" };
 }
@@ -688,8 +722,15 @@ cv.addEventListener("mousedown", (e)=>{
         }
       }
       if(e.button === 2){
-        const cur = state.lvl[node.id] || 0;
-        if(cur > 0) state.lvl[node.id] = cur - 1;
+        // ✅ (수정) 우클릭 -1: 자식이 찍혀 있으면 부모 취소 불가
+        const check = canDecrease(node.id);
+        if(check.ok){
+          const cur = state.lvl[node.id] || 0;
+          if(cur > 0) state.lvl[node.id] = cur - 1;
+        }else{
+          els.status.textContent = `❌ ${check.msg}`;
+          els.status.style.color = "#ff6b6b";
+        }
       }
     }
 
