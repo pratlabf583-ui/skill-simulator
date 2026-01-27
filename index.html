@@ -19,7 +19,6 @@ body{margin:0;background:var(--bg);color:var(--text);
 .kpi{font-size:18px;font-weight:900;}
 .muted{color:var(--muted);font-size:13px;white-space:pre-wrap;}
 button,input,textarea,select{
-
   background:#0f1624;color:var(--text);
   border:1px solid var(--line);border-radius:10px;padding:8px 12px;
 }
@@ -38,7 +37,13 @@ canvas{width:100%;height:100%;display:block;}
   border:1px solid var(--line);background:#0f1624;color:var(--muted);font-size:12px}
 .small{font-size:12px}
 .btnWide{width:100%}
-
+/* 🔒 SIM 잠김(비번 전) 흐림 처리 */
+.simLocked #cv {
+  filter: blur(2px) brightness(0.75);
+}
+.simLocked .hint {
+  opacity: 0.35;
+}
 /* 공유(뷰어) 모드에서 편집 UI 숨김 */
 .viewerOnlyHide{display:none !important;}
 </style>
@@ -84,6 +89,7 @@ canvas{width:100%;height:100%;display:block;}
       <button id="adminEdit">EDIT(관리자)</button>
       <button id="saveLink">링크 저장</button>
       <button id="resetPoints">포인트 초기화</button>
+      <button id="retrySimPwd" style="display:none">비밀번호 재입력</button>
     </div>
     <div class="muted small" id="shareInfo" style="margin-top:6px"></div>
   </div>
@@ -203,6 +209,9 @@ canvas{width:100%;height:100%;display:block;}
  *  ✅ 관리자 비밀번호
  *  ========================= */
 const ADMIN_PASSWORD = "dkgus12";
+  // ✅ SIM(공유) 비밀번호
+const SIM_PASSWORD = "prmochi#8535";
+
 
 const cv = document.getElementById("cv");
 const ctx = cv.getContext("2d");
@@ -221,7 +230,7 @@ const state = {
   parents: [],
   children: [],
 
-  // ✅ 배타(택1) 그룹: [{ parent:"N001", group:["N010","N011","N012"] }]
+  // ✅ 배타(택1) 그룹
   exclusives: [],
 
   bg: null,
@@ -244,6 +253,10 @@ const state = {
 
   viewerMode: false,
   adminUnlocked: false,
+
+  // 🔒 SIM 잠금 상태
+  simLocked: false,
+  simUnlockedOnce: false,
 };
 
 const els = {
@@ -258,6 +271,8 @@ const els = {
   resetPoints: document.getElementById("resetPoints"),
   saveLink: document.getElementById("saveLink"),
   shareInfo: document.getElementById("shareInfo"),
+
+  retrySimPwd: document.getElementById("retrySimPwd"),
 
   bgUrlInput: document.getElementById("bgUrlInput"),
   bgFile: document.getElementById("bgFile"),
@@ -298,6 +313,43 @@ const els = {
 
 function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
 
+function setSimLocked(on){
+  state.simLocked = on;
+
+  // 캔버스 흐림 토글 (stage에 클래스)
+  stage.classList.toggle("simLocked", on);
+
+  // 재입력 버튼 표시
+  if(els.retrySimPwd){
+    els.retrySimPwd.style.display = (on && state.viewerMode) ? "inline-block" : "none";
+  }
+
+  // 상태 문구
+  if(on){
+    els.status.textContent = "🔒 비밀번호 입력 후 사용 가능합니다. (화면 이동/줌은 가능)";
+    els.status.style.color = "#ff6b6b";
+  }else{
+    els.status.textContent = "✅ 잠금 해제됨";
+    els.status.style.color = "#9bb0d0";
+  }
+}
+
+function askSimPassword(){
+  const input = prompt("이 시뮬레이터는 비밀번호가 필요합니다.");
+  if(input === null) return; // 취소
+  if(input !== SIM_PASSWORD){
+    alert("❌ 비밀번호가 틀렸습니다.");
+    setSimLocked(true);
+    draw();
+    return;
+  }
+  alert("✅ 잠금 해제 완료!");
+  state.simUnlockedOnce = true;
+  setSimLocked(false);
+  draw();
+}
+  
+  
 function resize(){
   const r = stage.getBoundingClientRect();
   cv.width = r.width * devicePixelRatio;
@@ -383,9 +435,9 @@ function applyPack(obj){
   state.owned = Number(obj.owned ?? state.owned);
   state.nodes = Array.isArray(obj.nodes) ? obj.nodes : [];
   // ✅ 구버전 데이터 호환: prereqMode 없으면 ALL로 보정
-state.nodes.forEach(n=>{
-  if(!n.prereqMode) n.prereqMode = "ALL";
-});
+  state.nodes.forEach(n=>{
+    if(!n.prereqMode) n.prereqMode = "ALL";
+  });
 
   state.edges = Array.isArray(obj.edges) ? obj.edges : [];
   state.lvl = (obj.lvl && typeof obj.lvl==="object") ? obj.lvl : {};
@@ -548,7 +600,6 @@ function prereqOk(childId){
   return true;
 }
 
-
 function getExclusiveGroup(parentId, childId){
   return state.exclusives.find(g => g && g.parent===parentId && Array.isArray(g.group) && g.group.includes(childId)) || null;
 }
@@ -574,15 +625,13 @@ function canIncrease(childId){
 
   // 선행(모든 부모 max)
   if(!prereqOk(childId)){
-  const childNode = state.nodes.find(x=>x.id===childId);
-  const mode = (childNode && childNode.prereqMode) ? childNode.prereqMode : "ALL";
-  const hint = (mode === "ANY")
-    ? "선행(부모) 조건 미충족 (부모 중 1개 이상 max 필요)"
-    : "선행(부모) 조건 미충족 (부모 전부 max 필요)";
-  return { ok:false, msg: hint };
-}
-
-
+    const childNode = state.nodes.find(x=>x.id===childId);
+    const mode = (childNode && childNode.prereqMode) ? childNode.prereqMode : "ALL";
+    const hint = (mode === "ANY")
+      ? "선행(부모) 조건 미충족 (부모 중 1개 이상 max 필요)"
+      : "선행(부모) 조건 미충족 (부모 전부 max 필요)";
+    return { ok:false, msg: hint };
+  }
 
   // 배타(택1)
   if(!exclusiveOk(childId)) return { ok:false, msg:"같은 분기(택1) 라인이 이미 선택됨" };
@@ -774,6 +823,14 @@ cv.addEventListener("mousedown", (e)=>{
         state.dragOff.y = w.y - node.y;
       }
     }else{
+      // ✅ 잠김이면 노드 포인트 조작 막기 (화면 이동은 가능)
+      if(state.viewerMode && state.mode === "SIM" && state.simLocked){
+        els.status.textContent = "🔒 비밀번호 입력 후 노드 조작이 가능합니다. (비밀번호 재입력 버튼 눌러주세요)";
+        els.status.style.color = "#ff6b6b";
+        draw();
+        return;
+      }
+
       // SIM 포인트 조작 (+ 선행 AND + 배타)
       if(e.button === 0){
         const check = canIncrease(node.id);
@@ -877,6 +934,14 @@ cv.addEventListener("touchstart", (e)=>{
 
   const node = hitNode(w);
   if(node){
+    // ✅ 잠김이면 터치로 노드 조작 막기
+    if(state.viewerMode && state.mode === "SIM" && state.simLocked){
+      els.status.textContent = "🔒 비밀번호 입력 후 노드 조작이 가능합니다. (비밀번호 재입력 버튼 눌러주세요)";
+      els.status.style.color = "#ff6b6b";
+      draw();
+      return;
+    }
+
     const check = canIncrease(node.id);
     if(check.ok){
       state.lvl[node.id] = (state.lvl[node.id] || 0) + 1;
@@ -972,6 +1037,11 @@ els.resetPoints.addEventListener("click", ()=>{
   Object.keys(state.lvl).forEach(k=>state.lvl[k]=0);
   draw();
 });
+
+els.retrySimPwd.addEventListener("click", ()=>{
+  askSimPassword();
+});
+  
 
 els.saveLink.addEventListener("click", async ()=>{
   if(state.bgUrl && state.bgUrl.startsWith("blob:")){
@@ -1262,28 +1332,28 @@ els.labelSizeLabel.textContent = String(state.labelFontSize);
 
 // 시작
 resize();
+
+// ✅ (8) 링크로 접속(loaded=true) 시 즉시 SIM + 잠금 + 비번 팝업
 const loaded = loadFromHash();
 if(loaded){
   setViewerMode(true);
 
-  // ✅ 공유 링크로 들어오면 무조건 SIM 강제
+  // ✅ 공유 링크로 들어오면 무조건 SIM + 잠금
   state.mode = "SIM";
   els.modeBadge.textContent = "SIM(공유)";
+
+  setSimLocked(true);
+
+  // ✅ 자동 비번 팝업 시도 (막히면 버튼으로 재입력)
+  setTimeout(()=>{
+    askSimPassword();
+  }, 100);
+
 }else{
   setViewerMode(false);
+  setSimLocked(false);
 }
 draw();
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
