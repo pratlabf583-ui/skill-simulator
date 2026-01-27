@@ -37,11 +37,13 @@ canvas{width:100%;height:100%;display:block;}
   border:1px solid var(--line);background:#0f1624;color:var(--muted);font-size:12px}
 .small{font-size:12px}
 .btnWide{width:100%}
-
 /* 🔒 SIM 잠김(비번 전) 흐림 처리 */
-.simLocked #cv { filter: blur(2px) brightness(0.75); }
-.simLocked .hint { opacity: 0.35; }
-
+.simLocked #cv {
+  filter: blur(2px) brightness(0.75);
+}
+.simLocked .hint {
+  opacity: 0.35;
+}
 /* 공유(뷰어) 모드에서 편집 UI 숨김 */
 .viewerOnlyHide{display:none !important;}
 </style>
@@ -94,6 +96,7 @@ canvas{width:100%;height:100%;display:block;}
 </div>
 
 <div class="grid" id="gridRoot">
+
   <div class="card">
     <div class="stage" id="stage">
       <div class="toolbar">
@@ -177,6 +180,7 @@ canvas{width:100%;height:100%;display:block;}
       <button id="clearChild" class="btnWide">자식 목록 비우기</button>
     </div>
 
+    <!-- ✅ 배타(택1) 설정 -->
     <div class="row" style="margin-top:8px">
       <button id="setExclusive" class="btnWide">부모×자식 = 택1(배타)로 설정</button>
       <button id="clearExclusive" class="btnWide">배타(택1) 전부 삭제</button>
@@ -197,15 +201,17 @@ canvas{width:100%;height:100%;display:block;}
       <button id="loadJson" class="btnWide">JSON 불러오기(붙여넣기)</button>
     </div>
   </div>
+
 </div>
 </div>
 
 <script>
 /** =========================
- *  ✅ 관리자 비밀번호 / SIM 비밀번호
+ *  ✅ 관리자 비밀번호
  *  ========================= */
 const ADMIN_PASSWORD = "dkgus12";
-const SIM_PASSWORD   = "pramochi#8535";
+// ✅ SIM(공유) 비밀번호
+const SIM_PASSWORD = "prmochi#8535";
 
 const cv = document.getElementById("cv");
 const ctx = cv.getContext("2d");
@@ -222,7 +228,6 @@ const state = {
 
   parents: [],
   children: [],
-
   exclusives: [],
 
   bg: null,
@@ -264,21 +269,16 @@ const els = {
   saveLink: document.getElementById("saveLink"),
   shareInfo: document.getElementById("shareInfo"),
   retrySimPwd: document.getElementById("retrySimPwd"),
-
   bgUrlInput: document.getElementById("bgUrlInput"),
   bgFile: document.getElementById("bgFile"),
-
   zoomIn: document.getElementById("zoomIn"),
   zoomOut: document.getElementById("zoomOut"),
   resetView: document.getElementById("resetView"),
   clearAll: document.getElementById("clearAll"),
-
   nodeSize: document.getElementById("nodeSize"),
   nodeSizeLabel: document.getElementById("nodeSizeLabel"),
-
   labelSize: document.getElementById("labelSize"),
   labelSizeLabel: document.getElementById("labelSizeLabel"),
-
   selText: document.getElementById("selText"),
   nodeId: document.getElementById("nodeId"),
   nodeMax: document.getElementById("nodeMax"),
@@ -291,11 +291,9 @@ const els = {
   clearParent: document.getElementById("clearParent"),
   clearChild: document.getElementById("clearChild"),
   pcInfo: document.getElementById("pcInfo"),
-
   setExclusive: document.getElementById("setExclusive"),
   clearExclusive: document.getElementById("clearExclusive"),
   exInfo: document.getElementById("exInfo"),
-
   json: document.getElementById("json"),
   copyJson: document.getElementById("copyJson"),
   loadJson: document.getElementById("loadJson"),
@@ -307,7 +305,7 @@ function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
 function setSimLocked(on){
   state.simLocked = on;
 
-  // 캔버스 흐림 토글 (stage에 클래스)
+  // 캔버스 흐림 토글
   stage.classList.toggle("simLocked", on);
 
   // 재입력 버튼 표시
@@ -315,9 +313,9 @@ function setSimLocked(on){
     els.retrySimPwd.style.display = (on && state.viewerMode) ? "inline-block" : "none";
   }
 
-  // 상태 문구
+  // 상태 문구(여기서 찍어주고, updateTop에서 잠김이면 덮어쓰지 않게 처리)
   if(on){
-    els.status.textContent = "🔒 비밀번호 입력 후 사용 가능합니다. (화면 이동/줌은 가능)";
+    els.status.textContent = "🔒 비밀번호 입력 후 노드 조작이 가능합니다. (화면 이동/줌은 가능)  → 비밀번호 재입력 버튼";
     els.status.style.color = "#ff6b6b";
   }else{
     els.status.textContent = "✅ 잠금 해제됨";
@@ -326,8 +324,10 @@ function setSimLocked(on){
 }
 
 function askSimPassword(){
-  const input = prompt("이 시뮬레이터는 비밀번호가 필요합니다.");
-  if(input === null) return; // 취소
+  const inputRaw = prompt("이 시뮬레이터는 비밀번호가 필요합니다.");
+  if(inputRaw === null) return; // 취소
+  const input = String(inputRaw).trim(); // ✅ 공백 실수 방지
+
   if(input !== SIM_PASSWORD){
     alert("❌ 비밀번호가 틀렸습니다.");
     setSimLocked(true);
@@ -363,6 +363,12 @@ function updateTop(){
   els.modeBadge.textContent = state.viewerMode ? "SIM(공유)" : state.mode;
   els.toggleMode.textContent = (state.mode === "SIM") ? "편집기 보기" : "시뮬레이터 보기";
 
+  // ✅ 핵심: 잠김 상태면 status 문구를 updateTop이 덮어쓰지 않게
+  if(state.viewerMode && state.mode === "SIM" && state.simLocked){
+    // used/left 등은 갱신하되, status는 setSimLocked에서 찍은 문구 유지
+    return;
+  }
+
   const ok = used <= state.owned;
   els.status.innerHTML = ok
     ? `✅ 보유 ${state.owned}P 중 ${used}P 사용`
@@ -378,6 +384,7 @@ function updateRightPanel(){
     els.nodeId.value = n.id;
     els.nodeMax.value = n.max;
     if(els.prereqMode) els.prereqMode.value = n.prereqMode || "ALL";
+
     els.nodeSize.value = n.r;
     els.nodeSizeLabel.textContent = String(n.r);
   }else{
@@ -401,6 +408,7 @@ function updateRightPanel(){
 
 function pack({ includeLvl = true } = {}){
   const zeroLvl = Object.fromEntries(state.nodes.map(n => [n.id, 0]));
+
   return {
     seasonMax: state.seasonMax,
     owned: state.owned,
@@ -422,10 +430,9 @@ function syncJsonBox(){
 function applyPack(obj){
   state.owned = Number(obj.owned ?? state.owned);
   state.nodes = Array.isArray(obj.nodes) ? obj.nodes : [];
-
-  // ✅ 구버전 데이터 호환: prereqMode 없으면 ALL로 보정
   state.nodes.forEach(n=>{
     if(!n.prereqMode) n.prereqMode = "ALL";
+    if(typeof n.r !== "number") n.r = 22;
   });
 
   state.edges = Array.isArray(obj.edges) ? obj.edges : [];
@@ -529,9 +536,6 @@ function toggleIn(arr, id){
   else arr.splice(i,1);
 }
 
-/** =====================================
- * ✅ 선행조건 + 배타(택1) 검사 유틸
- * ===================================== */
 function parentsOf(childId){
   return state.edges.filter(([p,c])=>c===childId).map(([p])=>p);
 }
@@ -639,7 +643,6 @@ function canDecrease(nodeId){
       };
     }
   }
-
   return { ok:true, msg:"OK" };
 }
 
@@ -670,9 +673,12 @@ function draw(){
     let ok = true;
     if(state.mode === "SIM"){
       const prereq = prereqOk(c);
+
       let excl = true;
       const g = getExclusiveGroup(p, c);
-      if(g) excl = !otherChosenInGroup(g, c);
+      if(g){
+        excl = !otherChosenInGroup(g, c);
+      }
       ok = prereq && excl;
     }
 
@@ -706,6 +712,7 @@ function draw(){
       const sel = (n.id === state.selected);
       const isP = isIn(state.parents, n.id);
       const isC = isIn(state.children, n.id);
+
       if(isP) { stroke = "rgba(124,255,107,0.98)"; lw = 3; }
       if(isC) { stroke = "rgba(190,120,255,0.98)"; lw = 3; }
       if(sel) { stroke = "rgba(255,230,120,0.98)"; lw = 4; }
@@ -782,7 +789,7 @@ cv.addEventListener("mousedown", (e)=>{
         state.dragOff.y = w.y - node.y;
       }
     }else{
-      // ✅ (7A) 잠김이면 노드 포인트 조작만 막기 (화면 이동/줌은 가능)
+      // ✅ 잠김이면 노드 포인트 조작 막기 (화면 이동은 가능)
       if(state.viewerMode && state.mode === "SIM" && state.simLocked){
         els.status.textContent = "🔒 비밀번호 입력 후 노드 조작이 가능합니다. (비밀번호 재입력 버튼 눌러주세요)";
         els.status.style.color = "#ff6b6b";
@@ -790,6 +797,7 @@ cv.addEventListener("mousedown", (e)=>{
         return;
       }
 
+      // SIM 포인트 조작 (+ 선행 AND + 배타)
       if(e.button === 0){
         const check = canIncrease(node.id);
         if(check.ok){
@@ -816,6 +824,7 @@ cv.addEventListener("mousedown", (e)=>{
     return;
   }
 
+  // 빈 곳
   if(e.button === 0){
     if(state.mode === "EDIT" && !state.viewerMode){
       state.pendingAdd = { sx, sy, wx: w.x, wy: w.y };
@@ -860,251 +869,225 @@ cv.addEventListener("mousemove",(e)=>{
     state.tx = state.panStart.tx + dx;
     state.ty = state.panStart.ty + dy;
     draw();
-  }
-});
-
-cv.addEventListener("mouseup", ()=>{
-  if(state.pendingAdd && state.mode === "EDIT" && !state.viewerMode){
-    const { wx, wy } = state.pendingAdd;
-    const id = `N${String(state.nodes.length+1).padStart(3,"0")}`;
-    state.nodes.push({ id, x: wx, y: wy, max: 1, r: 22, prereqMode: "ALL" });
-    state.lvl[id] = 0;
-    state.selected = id;
-  }
-  stopAllDrag();
-  draw();
-});
-
-cv.addEventListener("mouseleave", ()=>{ stopAllDrag(); draw(); });
-cv.addEventListener("contextmenu", e=>e.preventDefault());
-cv.style.touchAction = "none";
-
-cv.addEventListener("touchstart", (e)=>{
-  e.preventDefault();
-  const t = e.touches[0];
-  const rect = cv.getBoundingClientRect();
-  const sx = t.clientX - rect.left;
-  const sy = t.clientY - rect.top;
-  const w = screenToWorld(sx, sy);
-
-  const node = hitNode(w);
-  if(node){
-    // ✅ (7B) 잠김이면 터치로 노드 조작 막기
-    if(state.viewerMode && state.mode === "SIM" && state.simLocked){
-      els.status.textContent = "🔒 비밀번호 입력 후 노드 조작이 가능합니다. (비밀번호 재입력 버튼 눌러주세요)";
-      els.status.style.color = "#ff6b6b";
-      draw();
-      return;
-    }
-
-    const check = canIncrease(node.id);
-    if(check.ok){
-      state.lvl[node.id] = (state.lvl[node.id] || 0) + 1;
-    }else{
-      els.status.textContent = `❌ ${check.msg}`;
-      els.status.style.color = "#ff6b6b";
-    }
-    draw();
     return;
   }
+});
 
-  startPan(sx, sy);
-}, { passive:false });
+cv.addEventListener("mouseup",(e)=>{
+  if(state.pendingAdd){
+    // 클릭으로 노드 추가
+    const w = { x: state.pendingAdd.wx, y: state.pendingAdd.wy };
+    state.pendingAdd = null;
 
-cv.addEventListener("touchmove", (e)=>{
-  e.preventDefault();
-  if(!state.panning) return;
-  const t = e.touches[0];
-  const rect = cv.getBoundingClientRect();
-  const sx = t.clientX - rect.left;
-  const sy = t.clientY - rect.top;
+    if(state.mode === "EDIT" && !state.viewerMode){
+      const id = `N${String(state.nodes.length+1).padStart(3,"0")}`;
+      const newNode = {
+        id,
+        x: w.x,
+        y: w.y,
+        r: Number(els.nodeSize.value || 22),
+        max: 1,
+        prereqMode: "ALL",
+      };
+      state.nodes.push(newNode);
+      state.lvl[id] = 0;
+      state.selected = id;
+      draw();
+    }
+  }
 
-  const dx = sx - state.panStart.sx;
-  const dy = sy - state.panStart.sy;
-  state.tx = state.panStart.tx + dx;
-  state.ty = state.panStart.ty + dy;
-  draw();
-}, { passive:false });
-
-cv.addEventListener("touchend", (e)=>{
-  e.preventDefault();
   stopAllDrag();
-  draw();
-}, { passive:false });
+});
 
-// 휠 줌
-cv.addEventListener("wheel", (e)=>{
+cv.addEventListener("mouseleave", ()=>{
+  stopAllDrag();
+});
+
+cv.addEventListener("contextmenu",(e)=> e.preventDefault());
+
+cv.addEventListener("wheel",(e)=>{
   e.preventDefault();
+
   const rect = cv.getBoundingClientRect();
   const sx = e.clientX - rect.left;
   const sy = e.clientY - rect.top;
-  const before = screenToWorld(sx, sy);
-  const zoomFactor = e.deltaY < 0 ? 1.12 : 1/1.12;
-  state.scale = clamp(state.scale * zoomFactor, 0.1, 8);
-  state.tx = sx - before.x * state.scale;
-  state.ty = sy - before.y * state.scale;
-  draw();
-}, { passive:false });
 
-// ----- UI 이벤트 -----
+  // 줌 기준점(마우스 위치)
+  const before = screenToWorld(sx, sy);
+
+  const delta = -Math.sign(e.deltaY);
+  const factor = (delta > 0) ? 1.08 : 1/1.08;
+  const nextScale = clamp(state.scale * factor, 0.2, 3.0);
+
+  state.scale = nextScale;
+
+  const after = screenToWorld(sx, sy);
+
+  // 마우스 위치가 같은 월드좌표를 가리키도록 tx/ty 보정
+  state.tx += (after.x - before.x) * state.scale;
+  state.ty += (after.y - before.y) * state.scale;
+
+  draw();
+},{ passive:false });
+
+/** =========================
+ *  UI 버튼/입력 이벤트
+ *  ========================= */
+
+// 보유 포인트
 els.ownedSp.addEventListener("input", ()=>{
-  const v = Number(els.ownedSp.value);
-  state.owned = Math.max(0, Math.min(state.seasonMax, isFinite(v)?v:0));
+  state.owned = clamp(Number(els.ownedSp.value || 0), 0, state.seasonMax);
+  els.ownedSp.value = String(state.owned);
   draw();
 });
 
-els.labelSize.addEventListener("input", ()=>{
-  state.labelFontSize = Number(els.labelSize.value);
-  els.labelSizeLabel.textContent = String(state.labelFontSize);
+// + / -
+els.zoomIn.addEventListener("click", ()=>{
+  state.scale = clamp(state.scale * 1.1, 0.2, 3.0);
+  draw();
+});
+els.zoomOut.addEventListener("click", ()=>{
+  state.scale = clamp(state.scale / 1.1, 0.2, 3.0);
+  draw();
+});
+els.resetView.addEventListener("click", ()=>{
+  state.scale = 1;
+  state.tx = 0;
+  state.ty = 0;
   draw();
 });
 
-els.toggleMode.addEventListener("click", ()=>{
-  if(state.viewerMode){
-    state.mode = "SIM";
-    draw();
-    return;
-  }
-  state.mode = (state.mode==="EDIT") ? "SIM" : "EDIT";
-  draw();
-});
-
-els.adminEdit.addEventListener("click", ()=>{
-  if(state.adminUnlocked){
-    setViewerMode(false);
-    state.mode = "EDIT";
-    draw();
-    return;
-  }
-  const input = prompt("관리자 비밀번호를 입력하세요");
-  if(input === null) return;
-  if(input !== ADMIN_PASSWORD){
-    alert("비밀번호가 틀렸습니다.");
-    return;
-  }
-  state.adminUnlocked = true;
-  setViewerMode(false);
-  state.mode = "EDIT";
-  alert("편집 잠금 해제 완료!");
-  draw();
-});
-
-els.resetPoints.addEventListener("click", ()=>{
-  Object.keys(state.lvl).forEach(k=>state.lvl[k]=0);
-  draw();
-});
-
-els.retrySimPwd.addEventListener("click", ()=>{
-  askSimPassword();
-});
-
-els.saveLink.addEventListener("click", async ()=>{
-  if(state.bgUrl && state.bgUrl.startsWith("blob:")){
-    alert(
-      "⚠️ 지금 배경은 로컬 파일(blob:)이라서 공유하면 다른 사람은 못 봅니다.\n" +
-      "배경 URL 입력칸에 https 이미지 URL을 넣어주세요."
-    );
-    return;
-  }
-
-  saveToHash({ includeLvl: false });
-  const url = location.href;
-
-  try{
-    await navigator.clipboard.writeText(url);
-    alert("✅ 링크 저장 + 복사 완료!\n붙여넣기(Ctrl+V)로 공유하세요.");
-  }catch(e){
-    prompt("아래 링크를 복사해서 공유하세요.", url);
-  }
-});
-
-// 줌 버튼
-function zoomAtCenter(factor){
-  const rect = cv.getBoundingClientRect();
-  const sx = rect.width/2, sy = rect.height/2;
-  const before = screenToWorld(sx, sy);
-  state.scale = clamp(state.scale * factor, 0.1, 8);
-  state.tx = sx - before.x * state.scale;
-  state.ty = sy - before.y * state.scale;
-  draw();
-}
-els.zoomIn.addEventListener("click", ()=>zoomAtCenter(1.15));
-els.zoomOut.addEventListener("click", ()=>zoomAtCenter(1/1.15));
-els.resetView.addEventListener("click", ()=>{ state.scale=1; state.tx=0; state.ty=0; draw(); });
-
-// 배경 URL
-els.bgUrlInput.addEventListener("change", ()=>{
-  if(state.viewerMode) return;
-  const url = els.bgUrlInput.value.trim();
-  if(url) loadBgFromUrl(url, false);
-});
-
-// 로컬 파일
-els.bgFile.addEventListener("change", (e)=>{
-  if(state.viewerMode){
-    alert("공유(뷰어) 모드에서는 배경 업로드가 막혀있습니다. EDIT(관리자)로 잠금 해제하세요.");
-    e.target.value = "";
-    return;
-  }
-  const f = e.target.files?.[0];
-  if(!f) return;
-
-  const img = new Image();
-  img.onload = ()=>{
-    state.bg = img;
-    state.bgUrl = null;
-
-    state.scale = stage.clientWidth / img.width;
-    state.tx = 0;
-    state.ty = 0;
-
-    alert("로컬 파일 배경 적용 완료!\n공유하려면 배경 URL 입력칸에 https 이미지 URL을 넣어야 다른 사람도 보입니다.");
-    draw();
-  };
-  img.src = URL.createObjectURL(f);
-});
-
-// 전체 삭제
+// 노드/라인 전체삭제
 els.clearAll.addEventListener("click", ()=>{
-  if(state.viewerMode) return;
   if(!confirm("노드/라인을 전부 삭제할까?")) return;
   state.nodes = [];
   state.edges = [];
+  state.exclusives = [];
   state.lvl = {};
   state.selected = null;
   state.parents = [];
   state.children = [];
-  state.exclusives = [];
   draw();
 });
 
 // 선택 노드 크기
 els.nodeSize.addEventListener("input", ()=>{
-  if(state.viewerMode) return;
-  if(!state.selected) return;
+  els.nodeSizeLabel.textContent = String(els.nodeSize.value);
   const n = state.nodes.find(x=>x.id===state.selected);
-  if(!n) return;
-  n.r = Number(els.nodeSize.value);
-  els.nodeSizeLabel.textContent = String(n.r);
+  if(n){
+    n.r = Number(els.nodeSize.value);
+    draw();
+  }
+});
+
+// 전체 숫자 크기
+els.labelSize.addEventListener("input", ()=>{
+  state.labelFontSize = clamp(Number(els.labelSize.value), 10, 34);
+  els.labelSizeLabel.textContent = String(state.labelFontSize);
   draw();
 });
 
-// 노드 정보 적용
+// 배경 URL 로드
+els.bgUrlInput.addEventListener("change", ()=>{
+  if(state.viewerMode) return;
+  const url = String(els.bgUrlInput.value || "").trim();
+  if(url) loadBgFromUrl(url, false);
+});
+
+// 배경 파일 업로드(로컬) → 편집 중에만(공유는 url 필요)
+els.bgFile.addEventListener("change", (e)=>{
+  if(state.viewerMode) return;
+  const f = e.target.files && e.target.files[0];
+  if(!f) return;
+  const url = URL.createObjectURL(f);
+  // 로컬은 공유 불가: 경고는 loadBgFromUrl에서 처리(근데 blob이면 alert)
+  loadBgFromUrl(url, true);
+});
+
+// 포인트 초기화
+els.resetPoints.addEventListener("click", ()=>{
+  if(!confirm("포인트를 전부 0으로 초기화할까?")) return;
+  state.nodes.forEach(n=> state.lvl[n.id] = 0);
+  draw();
+});
+
+// 링크 저장
+els.saveLink.addEventListener("click", ()=>{
+  saveToHash({ includeLvl: false });
+
+  const url = location.href;
+  try{
+    navigator.clipboard.writeText(url);
+    els.shareInfo.textContent = "✅ 링크가 복사됨 (붙여넣기 해서 공유하면 됨)";
+  }catch(e){
+    els.shareInfo.textContent = "✅ 링크 저장됨 (주소창 URL 복사해서 공유)";
+  }
+  draw();
+});
+
+// SIM/EDIT 토글
+els.toggleMode.addEventListener("click", ()=>{
+  if(state.viewerMode){
+    // 공유자: SIM만
+    state.mode = "SIM";
+  }else{
+    state.mode = (state.mode === "SIM") ? "EDIT" : "SIM";
+  }
+  draw();
+});
+
+// 관리자 EDIT(비번)
+els.adminEdit.addEventListener("click", ()=>{
+  if(state.adminUnlocked){
+    // 이미 풀렸으면 토글로 뷰어모드 끄기
+    setViewerMode(false);
+    state.mode = "EDIT";
+    draw();
+    return;
+  }
+
+  const inputRaw = prompt("관리자 비밀번호를 입력하세요.");
+  if(inputRaw === null) return;
+  const input = String(inputRaw).trim();
+
+  if(input !== ADMIN_PASSWORD){
+    alert("❌ 비밀번호가 틀렸습니다.");
+    return;
+  }
+
+  alert("✅ 관리자 모드 해제(EDIT 가능)");
+  state.adminUnlocked = true;
+  setViewerMode(false);
+  state.mode = "EDIT";
+  draw();
+});
+
+// SIM 비번 재입력 버튼
+if(els.retrySimPwd){
+  els.retrySimPwd.addEventListener("click", ()=>{
+    askSimPassword();
+  });
+}
+
+/** =========================
+ *  우측 패널(노드/연결/배타)
+ *  ========================= */
+
 els.applyNode.addEventListener("click", ()=>{
   if(state.viewerMode) return;
-  if(!state.selected) return;
+
   const n = state.nodes.find(x=>x.id===state.selected);
-  if(!n) return;
+  if(!n) return alert("선택된 노드가 없어!");
 
-  const newId = (els.nodeId.value || n.id).trim();
-  const newMax = Math.max(1, Number(els.nodeMax.value) || 1);
+  const newId = String(els.nodeId.value || "").trim();
+  const newMax = clamp(Number(els.nodeMax.value || 1), 1, 999);
+  const newMode = (els.prereqMode && els.prereqMode.value) ? els.prereqMode.value : "ALL";
 
-  if(newId !== n.id){
+  // id 변경 시 충돌 체크
+  if(newId && newId !== n.id){
+    if(state.nodes.some(x=>x.id===newId)) return alert("이미 같은 ID가 존재해!");
+    // edges / lvl / parents / children / selected / exclusives까지 모두 치환
     const oldId = n.id;
-    if(state.nodes.some(x=>x.id===newId)){
-      alert("이미 존재하는 노드 ID입니다.");
-      return;
-    }
     n.id = newId;
 
     state.edges = state.edges.map(([p,c])=>[
@@ -1112,97 +1095,67 @@ els.applyNode.addEventListener("click", ()=>{
       c===oldId ? newId : c
     ]);
 
-    state.lvl[newId] = state.lvl[oldId] || 0;
+    // lvl key 변경
+    const oldVal = state.lvl[oldId] || 0;
     delete state.lvl[oldId];
+    state.lvl[newId] = oldVal;
 
-    state.parents = state.parents.map(x=>x===oldId?newId:x);
-    state.children = state.children.map(x=>x===oldId?newId:x);
+    // 선택/리스트 변경
+    if(state.selected === oldId) state.selected = newId;
+    state.parents = state.parents.map(x=> x===oldId ? newId : x);
+    state.children = state.children.map(x=> x===oldId ? newId : x);
 
-    state.exclusives = state.exclusives.map(g=>{
+    // 배타 그룹 변경
+    state.exclusives = (state.exclusives||[]).map(g=>{
       const parent = (g.parent===oldId) ? newId : g.parent;
-      const group = (g.group||[]).map(id=>id===oldId?newId:id);
+      const group = Array.isArray(g.group) ? g.group.map(x=> x===oldId ? newId : x) : [];
       return { parent, group };
     });
-
-    if(state.selected===oldId) state.selected=newId;
   }
 
   n.max = newMax;
-  if(els.prereqMode) n.prereqMode = els.prereqMode.value || "ALL";
+  n.prereqMode = newMode || "ALL";
+
+  // max 줄었으면 현재 lvl이 max보다 클 수 있으니 보정
+  state.lvl[n.id] = clamp(Number(state.lvl[n.id] || 0), 0, n.max);
 
   draw();
 });
 
-// 노드 삭제
 els.delNode.addEventListener("click", ()=>{
   if(state.viewerMode) return;
-  if(!state.selected) return;
   const id = state.selected;
+  if(!id) return;
+
+  if(!confirm(`${id} 노드를 삭제할까? (연결/배타도 같이 정리됨)`)) return;
+
   state.nodes = state.nodes.filter(n=>n.id!==id);
   state.edges = state.edges.filter(([p,c])=>p!==id && c!==id);
   delete state.lvl[id];
 
+  // 배타 그룹에서도 제거
+  state.exclusives = (state.exclusives||[])
+    .map(g=>({ parent:g.parent, group:(g.group||[]).filter(x=>x!==id) }))
+    .filter(g => g.parent !== id && (g.group||[]).length);
+
   state.parents = state.parents.filter(x=>x!==id);
   state.children = state.children.filter(x=>x!==id);
+  state.selected = null;
 
-  state.exclusives = state.exclusives
-    .map(g => ({ parent: g.parent, group: (g.group||[]).filter(x=>x!==id) }))
-    .filter(g => g.parent !== id && (g.group||[]).length >= 2);
-
-  state.selected=null;
   draw();
 });
 
-// 부모/자식 토글
+// 부모/자식 목록 토글
 els.setParent.addEventListener("click", ()=>{
   if(state.viewerMode) return;
-  if(!state.selected) return;
+  if(!state.selected) return alert("노드를 먼저 선택해줘!");
   toggleIn(state.parents, state.selected);
   draw();
 });
 els.setChild.addEventListener("click", ()=>{
   if(state.viewerMode) return;
-  if(!state.selected) return;
+  if(!state.selected) return alert("노드를 먼저 선택해줘!");
   toggleIn(state.children, state.selected);
-  draw();
-});
-
-// 연결 추가/제거
-els.addEdge.addEventListener("click", ()=>{
-  if(state.viewerMode) return;
-  if(!state.parents.length || !state.children.length){
-    alert("부모 목록과 자식 목록을 먼저 지정해줘.");
-    return;
-  }
-
-  let added = 0;
-  for(const p of state.parents){
-    for(const c of state.children){
-      if(p === c) continue;
-      const exists = state.edges.some(([pp,cc])=>pp===p && cc===c);
-      if(!exists){
-        state.edges.push([p,c]);
-        added++;
-      }
-    }
-  }
-  if(!added) alert("추가할 새 연결이 없어요. (이미 존재하거나 부모=자식)");
-  draw();
-});
-
-els.removeEdge.addEventListener("click", ()=>{
-  if(state.viewerMode) return;
-  if(!state.parents.length || !state.children.length){
-    alert("부모 목록과 자식 목록을 먼저 지정해줘.");
-    return;
-  }
-
-  const before = state.edges.length;
-  state.edges = state.edges.filter(([p,c])=>{
-    return !(state.parents.includes(p) && state.children.includes(c));
-  });
-  const removed = before - state.edges.length;
-  if(!removed) alert("제거할 연결이 없어요.");
   draw();
 });
 
@@ -1217,29 +1170,67 @@ els.clearChild.addEventListener("click", ()=>{
   draw();
 });
 
-// 배타(택1) 설정
-els.setExclusive.addEventListener("click", ()=>{
+// 연결 추가/제거(부모목록×자식목록)
+els.addEdge.addEventListener("click", ()=>{
   if(state.viewerMode) return;
-  if(!state.parents.length || !state.children.length){
-    alert("부모 목록과 자식 목록을 먼저 지정해줘.");
-    return;
-  }
+  if(!state.parents.length || !state.children.length) return alert("부모/자식 목록을 먼저 채워줘!");
 
   for(const p of state.parents){
-    const group = [...new Set(state.children)].filter(id=>id !== p);
-
-    const exists = state.exclusives.some(g =>
-      g.parent===p &&
-      (g.group||[]).length===group.length &&
-      (g.group||[]).every(id=>group.includes(id))
-    );
-
-    if(!exists && group.length >= 2){
-      state.exclusives.push({ parent: p, group });
+    for(const c of state.children){
+      if(p === c) continue;
+      if(!state.edges.some(([pp,cc])=>pp===p && cc===c)){
+        state.edges.push([p,c]);
+      }
     }
   }
+  draw();
+});
 
-  alert("배타(택1) 그룹 설정 완료!");
+els.removeEdge.addEventListener("click", ()=>{
+  if(state.viewerMode) return;
+  if(!state.parents.length || !state.children.length) return alert("부모/자식 목록을 먼저 채워줘!");
+
+  state.edges = state.edges.filter(([p,c])=>{
+    const pHit = state.parents.includes(p);
+    const cHit = state.children.includes(c);
+    return !(pHit && cHit);
+  });
+
+  // 연결 제거되면 배타 그룹도 의미없을 수 있어서 안전 정리
+  const edgeSet = new Set(state.edges.map(([p,c])=>`${p}=>${c}`));
+  state.exclusives = (state.exclusives||[])
+    .map(g=>{
+      const parent = g.parent;
+      const group = (g.group||[]).filter(ch => edgeSet.has(`${parent}=>${ch}`));
+      return { parent, group };
+    })
+    .filter(g => (g.group||[]).length);
+
+  draw();
+});
+
+// ✅ 배타(택1) 설정
+els.setExclusive.addEventListener("click", ()=>{
+  if(state.viewerMode) return;
+  if(!state.parents.length || !state.children.length) return alert("부모/자식 목록을 먼저 채워줘!");
+
+  // 부모목록×자식목록을 “부모별 그룹”으로 묶어서 등록
+  for(const p of state.parents){
+    const groupChildren = state.children.filter(c=>c!==p);
+
+    // 연결이 실제로 존재하는 것만 배타로 넣기
+    const validChildren = groupChildren.filter(c => state.edges.some(([pp,cc])=>pp===p && cc===c));
+    if(!validChildren.length) continue;
+
+    let g = state.exclusives.find(x=>x.parent===p);
+    if(!g){
+      g = { parent:p, group:[] };
+      state.exclusives.push(g);
+    }
+    for(const c of validChildren){
+      if(!g.group.includes(c)) g.group.push(c);
+    }
+  }
   draw();
 });
 
@@ -1252,55 +1243,58 @@ els.clearExclusive.addEventListener("click", ()=>{
 
 // JSON 복사/불러오기
 els.copyJson.addEventListener("click", async ()=>{
-  if(state.viewerMode) return;
+  const text = els.json.value || "";
   try{
-    await navigator.clipboard.writeText(els.json.value);
-    alert("JSON 복사 완료");
+    await navigator.clipboard.writeText(text);
+    alert("✅ JSON 복사 완료!");
   }catch(e){
-    alert("복사 실패. JSON 박스에서 직접 복사해줘.");
+    alert("복사 실패! 직접 드래그해서 복사해줘.");
   }
 });
 
 els.loadJson.addEventListener("click", ()=>{
   if(state.viewerMode) return;
   try{
-    const obj = JSON.parse(els.json.value);
+    const obj = JSON.parse(els.json.value || "{}");
     applyPack(obj);
-    els.ownedSp.value = String(state.owned);
     draw();
-    alert("불러오기 완료");
   }catch(e){
-    alert("JSON 형식이 잘못됐어.");
+    alert("❌ JSON 파싱 실패! 형식이 올바른지 확인해줘.");
   }
 });
 
-// 초기 슬라이더
-els.labelSize.value = String(state.labelFontSize);
-els.labelSizeLabel.textContent = String(state.labelFontSize);
+/** =========================
+ *  시작 시: 해시 로드 & 공유모드 판별
+ *  ========================= */
 
-// 시작
-resize();
+(function init(){
+  // 해시 있으면 로드
+  const has = loadFromHash();
 
-/** ✅ (8) 링크로 접속(loaded=true) 시 즉시 SIM + 잠금 + 비번 팝업 */
-const loaded = loadFromHash();
-if(loaded){
-  setViewerMode(true);
+  // 해시로 들어온 경우 = 공유 링크일 가능성 높음 → 뷰어모드 ON
+  if(has){
+    setViewerMode(true);
 
-  state.mode = "SIM";
-  els.modeBadge.textContent = "SIM(공유)";
+    // 공유 SIM은 기본 잠금
+    if(!state.simUnlockedOnce){
+      setSimLocked(true);
+    }
+  }else{
+    // 기본은 편집자
+    setViewerMode(false);
+  }
 
-  setSimLocked(true);
+  // 초기 보유값 반영
+  state.owned = clamp(Number(els.ownedSp.value || 0), 0, state.seasonMax);
+  els.ownedSp.value = String(state.owned);
 
-  // ✅ 자동 비번 팝업 시도 (막히면 버튼으로 재입력)
-  setTimeout(()=>{
-    askSimPassword();
-  }, 100);
+  // 최초 렌더
+  resize();
+  draw();
 
-}else{
-  setViewerMode(false);
-  setSimLocked(false);
-}
-draw();
+  // 공유자면 처음 한번 비번 요청(자동 팝업 원하면 아래 주석 해제)
+  // if(state.viewerMode){ askSimPassword(); }
+})();
 </script>
 </body>
 </html>
