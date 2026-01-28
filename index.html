@@ -238,12 +238,25 @@ const SUPABASE_URL = "https://ytzggylozlcgcaoaupwo.supabase.co";       // Settin
 const SUPABASE_ANON_KEY = "sb_publishable_rZtoLYXkC53jwHycEzC2ZQ_RW82bspa"; // Settings → API Keys → Publishable key
 
 const SB = window.supabase || window.supabaseJs;
-if(!SB || !SB.createClient){
+
+if (!SB || typeof SB.createClient !== "function") {
   alert("Supabase 라이브러리 로드 실패(차단/오프라인). Ctrl+F5 해보고, 그래도 안되면 애드블록/보안프로그램 확인!");
   throw new Error("Supabase SDK not loaded");
 }
-window.supabaseClient = window.supabaseClient || SB.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const sb = window.supabaseClient; // ✅ 이름을 supabase 말고 sb로!
+
+// ✅ 전역에 '클라이언트'를 한 번만 만들고 재사용
+window.__SB_CLIENT__ = window.__SB_CLIENT__ || SB.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ✅ 앞으로는 이 이름만 사용 (supabase 라는 이름 안 씀)
+const sbClient = window.__SB_CLIENT__;
+
+// ✅ 방어 코드: 진짜 클라이언트인지 확인
+if (!sbClient || typeof sbClient.from !== "function") {
+  console.log("SB =", SB);
+  console.log("sbClient =", sbClient);
+  throw new Error("Supabase client is invalid: sbClient.from is not a function");
+}
+
 
 
 
@@ -260,9 +273,10 @@ function makeId(len = 10){
 async function saveToDB(payloadObj){
   const id = makeId(10);
 
-  const { error } = await sb
-    .from("shares")
-    .insert([{ id, payload: payloadObj }]);
+  const { error } = await sbClient
+  .from("shares")
+  .insert([{ id, payload: payloadObj }]);
+
 
   if(error) throw error;
   return id;
@@ -270,11 +284,11 @@ async function saveToDB(payloadObj){
 
 // 불러오기: id로 payload 가져오기
 async function loadFromDB(id){
-  const { data, error } = await sb
-    .from("shares")
-    .select("payload")
-    .eq("id", id)
-    .single();
+  const { data, error } = await sbClient
+  .from("shares")
+  .select("payload")
+  .eq("id", id)
+  .single();
 
   if(error) throw error;
   return data.payload;
@@ -1454,6 +1468,7 @@ els.loadJson.addEventListener("click", ()=>{
 </script>
 </body>
 </html>
+
 
 
 
