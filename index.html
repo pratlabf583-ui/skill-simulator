@@ -260,7 +260,7 @@ function makeId(len = 10){
 async function saveToDB(payloadObj){
   const id = makeId(10);
 
-  const { error } = await supabase
+  const { error } = await sb
     .from("shares")
     .insert([{ id, payload: payloadObj }]);
 
@@ -270,7 +270,7 @@ async function saveToDB(payloadObj){
 
 // 불러오기: id로 payload 가져오기
 async function loadFromDB(id){
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from("shares")
     .select("payload")
     .eq("id", id)
@@ -1454,6 +1454,7 @@ els.loadJson.addEventListener("click", ()=>{
 </script>
 </body>
 </html>
+
 
 
 
