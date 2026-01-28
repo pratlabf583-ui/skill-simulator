@@ -243,7 +243,8 @@ if(!SB || !SB.createClient){
   throw new Error("Supabase SDK not loaded");
 }
 window.supabaseClient = window.supabaseClient || SB.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const supabase = window.supabaseClient;
+const sb = window.supabaseClient; // ✅ 이름을 supabase 말고 sb로!
+
 
 
 
@@ -1453,6 +1454,7 @@ els.loadJson.addEventListener("click", ()=>{
 </script>
 </body>
 </html>
+
 
 
 
