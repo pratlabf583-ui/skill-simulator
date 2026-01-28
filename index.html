@@ -227,8 +227,51 @@ canvas{width:100%;height:100%;display:block;}
 </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/lz-string@1.4.4/libs/lz-string.min.js"></script>  
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/lz-string@1.4.4/libs/lz-string.min.js"></script>
 <script>
+
+/** =========================
+ *  ✅ Supabase 설정 (여기만 네 값으로 바꾸기)
+ *  ========================= */
+const SUPABASE_URL = "https://ytzggylozlcgcaoaupwo.supabase.co";       // Settings → Data API → Project URL
+const SUPABASE_ANON_KEY = "sb_publishable_rZtoLYXkC53jwHycEzC2ZQ_RW82bspa"; // Settings → API Keys → Publishable key
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// 짧은 ID 생성 (8~10자리)
+function makeId(len = 10){
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let out = "";
+  for(let i=0;i<len;i++) out += chars[Math.floor(Math.random()*chars.length)];
+  return out;
+}
+
+// 저장: payload(json)를 DB에 저장하고 id 반환
+async function saveToDB(payloadObj){
+  const id = makeId(10);
+
+  const { error } = await supabase
+    .from("shares")
+    .insert([{ id, payload: payloadObj }]);
+
+  if(error) throw error;
+  return id;
+}
+
+// 불러오기: id로 payload 가져오기
+async function loadFromDB(id){
+  const { data, error } = await supabase
+    .from("shares")
+    .select("payload")
+    .eq("id", id)
+    .single();
+
+  if(error) throw error;
+  return data.payload;
+}
+
+  
 /** =========================
  *  ✅ 관리자 비밀번호
  *  ========================= */
@@ -1068,35 +1111,41 @@ els.resetPoints.addEventListener("click", ()=>{
   draw();
 });
 
-// 링크 저장(초기화) = 템플릿 공유 (포인트 상태는 0으로)
-els.saveLinkBase.addEventListener("click", ()=>{
-  saveToHash({ includeLvl: false });
-
-  const url = location.origin + location.pathname + location.search + location.hash;
-
+// 링크 저장(초기화) = 템플릿 공유 (포인트 상태는 0으로)  ✅ DB짧은링크
+els.saveLinkBase.addEventListener("click", async ()=>{
   try{
-    navigator.clipboard.writeText(url);
-    els.shareInfo.textContent = "✅ 링크(초기화)가 복사됨";
+    const payload = pack({ includeLvl: false }); // 포인트 0 포함
+    const id = await saveToDB(payload);
+
+    const url = location.origin + location.pathname + "?id=" + id;
+
+    await navigator.clipboard.writeText(url);
+    els.shareInfo.textContent = "✅ 짧은 링크(초기화)가 복사됨";
   }catch(e){
-    els.shareInfo.textContent = "✅ 링크(초기화) 저장됨 (주소창 URL 복사)";
+    console.error(e);
+    els.shareInfo.textContent = "❌ 짧은 링크 저장 실패";
   }
   draw();
 });
 
-// 링크 저장(내 빌드) = 현재 찍은 포인트 상태까지 포함
-els.saveLinkBuild.addEventListener("click", ()=>{
-  saveToHash({ includeLvl: true });
 
-  const url = location.origin + location.pathname + location.search + location.hash;
-
+// 링크 저장(내 빌드) = 현재 찍은 포인트 상태까지 포함 ✅ DB짧은링크
+els.saveLinkBuild.addEventListener("click", async ()=>{
   try{
-    navigator.clipboard.writeText(url);
-    els.shareInfo.textContent = "✅ 링크(내 빌드)가 복사됨";
+    const payload = pack({ includeLvl: true }); // 현재 포인트 포함
+    const id = await saveToDB(payload);
+
+    const url = location.origin + location.pathname + "?id=" + id;
+
+    await navigator.clipboard.writeText(url);
+    els.shareInfo.textContent = "✅ 짧은 링크(내 빌드)가 복사됨";
   }catch(e){
-    els.shareInfo.textContent = "✅ 링크(내 빌드) 저장됨 (주소창 URL 복사)";
+    console.error(e);
+    els.shareInfo.textContent = "❌ 짧은 링크 저장 실패";
   }
   draw();
 });
+
 
 
 // SIM/EDIT 토글
@@ -1342,6 +1391,30 @@ els.loadJson.addEventListener("click", ()=>{
  *  ========================= */
 
 (function init(){
+    // ✅ ?id=xxxx 로 들어온 경우: DB에서 로드(짧은 링크)
+  const params = new URLSearchParams(location.search);
+  const shareId = params.get("id");
+
+  if(shareId){
+    loadFromDB(shareId)
+      .then(payload=>{
+        applyPack(payload);
+        setViewerMode(true);
+
+        // 공유 SIM은 기본 잠금
+        if(!state.simUnlockedOnce) setSimLocked(true);
+
+        resize();
+        draw();
+      })
+      .catch(err=>{
+        console.error(err);
+        alert("❌ 유효하지 않은 공유 링크입니다.");
+      });
+
+    return; // 여기서 종료 (hash 로직 안탐)
+  }
+
   // 해시 있으면 로드
   const has = loadFromHash();
 
@@ -1372,6 +1445,7 @@ els.loadJson.addEventListener("click", ()=>{
 </script>
 </body>
 </html>
+
 
 
 
