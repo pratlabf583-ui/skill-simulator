@@ -391,7 +391,64 @@ const els = {
 };
 
 function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+// =========================
+// ✅ 숫자 캡슐(라벨) 그리기 유틸
+// =========================
+function drawLabelCapsule(ctx, text, x, y, opt = {}){
+  const padX = opt.padX ?? 10;
+  if(opt.font) ctx.font = opt.font;
+  const padY = opt.padY ?? 6;
+  const r    = opt.r ?? 10;
 
+  const bgA  = opt.bgA ?? 0.70;              // 배경 투명도
+  const fill = opt.fill ?? "#ffffff";        // 글자색
+  const border = opt.border ?? "rgba(255,230,120,0.9)"; // 테두리(금색 느낌)
+  const borderW = opt.borderW ?? 2;
+
+  const shadowBlur = opt.shadowBlur ?? 10;
+  const shadowColor = opt.shadowColor ?? "rgba(255,210,90,0.35)";
+
+  // 텍스트 크기 측정
+  const m = ctx.measureText(text);
+  const w = m.width + padX*2;
+  const h = (opt.h ?? (state.labelFontSize + padY*2));
+
+  const left = x - w/2;
+  const top  = y - h/2;
+
+  // 캡슐(둥근 사각형) path
+  ctx.save();
+  ctx.beginPath();
+  const rr = Math.min(r, h/2, w/2);
+  ctx.moveTo(left + rr, top);
+  ctx.arcTo(left + w, top, left + w, top + h, rr);
+  ctx.arcTo(left + w, top + h, left, top + h, rr);
+  ctx.arcTo(left, top + h, left, top, rr);
+  ctx.arcTo(left, top, left + w, top, rr);
+  ctx.closePath();
+
+  // 배경
+  ctx.fillStyle = `rgba(0,0,0,${bgA})`;
+  ctx.fill();
+
+  // 테두리 + 은은한 글로우
+  ctx.lineWidth = borderW;
+  ctx.strokeStyle = border;
+  ctx.shadowColor = shadowColor;
+  ctx.shadowBlur = shadowBlur;
+  ctx.stroke();
+
+  // 텍스트
+  ctx.shadowColor = "rgba(0,0,0,0.9)";
+  ctx.shadowBlur = 6;
+  ctx.fillStyle = fill;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, x, y);
+
+  ctx.restore();
+}
+  
 function setSimLocked(on){
   state.simLocked = on;
 
@@ -849,20 +906,46 @@ let lw = 2;
 
     ctx.globalAlpha = 1;
     ctx.textAlign = "center";
-    ctx.font = `900 ${state.labelFontSize}px sans-serif`;
+const font = `900 ${state.labelFontSize}px sans-serif`;
+ctx.font = font;
 
-    if(isMaxed){
-      ctx.fillStyle = "#7CFF6B";
-      ctx.shadowColor = "rgba(124,255,107,0.9)";
-      ctx.shadowBlur = 12;
-    }else{
-      ctx.fillStyle = "#ffffff";
-      ctx.shadowColor = "transparent";
-      ctx.shadowBlur = 0;
-    }
+ctx.shadowColor = "transparent";
+ctx.shadowBlur = 0;
 
-    const y = n.y + n.r + (state.labelFontSize + 6);
-    ctx.fillText(`${cur}/${n.max}`, n.x, y);
+const y = n.y + n.r + (state.labelFontSize + 12);
+const text = `${cur}/${n.max}`;
+
+
+// ✅ 최대치면 형광 글자 느낌(기존 유지) + 캡슐 테두리도 더 강조
+if(isMaxed){
+  drawLabelCapsule(ctx, text, n.x, y, {
+  font,
+  bgA: 0.75,
+  fill: "#7CFF6B",
+  border: "rgba(124,255,107,0.95)",
+  borderW: 2,
+  shadowColor: "rgba(124,255,107,0.35)",
+  shadowBlur: 12,
+  r: 10,
+  padX: 12,
+  padY: 6
+});
+
+}else{
+  drawLabelCapsule(ctx, text, n.x, y, {
+  font,
+  bgA: 0.70,
+  fill: "#ffffff",
+  border: "rgba(255,230,120,0.85)",
+  borderW: 2,
+  shadowColor: "rgba(255,210,90,0.30)",
+  shadowBlur: 10,
+  r: 10,
+  padX: 12,
+  padY: 6
+});
+}
+
 
     ctx.shadowColor = "transparent";
     ctx.shadowBlur = 0;
@@ -1468,6 +1551,7 @@ els.loadJson.addEventListener("click", ()=>{
 </script>
 </body>
 </html>
+
 
 
 
