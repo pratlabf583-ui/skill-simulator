@@ -237,7 +237,8 @@ canvas{width:100%;height:100%;display:block;}
 const SUPABASE_URL = "https://ytzggylozlcgcaoaupwo.supabase.co";       // Settings → Data API → Project URL
 const SUPABASE_ANON_KEY = "sb_publishable_rZtoLYXkC53jwHycEzC2ZQ_RW82bspa"; // Settings → API Keys → Publishable key
 
-const SB = window.supabase || window.supabaseJs;
+// ✅ Supabase UMD 전역은 보통 window.supabase 하나만 잡으면 됨
+const SB = window.supabase;
 
 if (!SB || typeof SB.createClient !== "function") {
   alert("Supabase 라이브러리 로드 실패(차단/오프라인). Ctrl+F5 해보고, 그래도 안되면 애드블록/보안프로그램 확인!");
@@ -247,15 +248,16 @@ if (!SB || typeof SB.createClient !== "function") {
 // ✅ 전역에 '클라이언트'를 한 번만 만들고 재사용
 window.__SB_CLIENT__ = window.__SB_CLIENT__ || SB.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ✅ 앞으로는 이 이름만 사용 (supabase 라는 이름 안 씀)
+// ✅ 앞으로는 이 이름만 사용
 const sbClient = window.__SB_CLIENT__;
 
-// ✅ 방어 코드: 진짜 클라이언트인지 확인
+// ✅ 방어 코드
 if (!sbClient || typeof sbClient.from !== "function") {
   console.log("SB =", SB);
   console.log("sbClient =", sbClient);
   throw new Error("Supabase client is invalid: sbClient.from is not a function");
 }
+
 
 
 
@@ -580,6 +582,7 @@ function syncJsonBox(){
 
 function applyPack(obj){
   state.owned = Number(obj.owned ?? state.owned);
+  state.bgUrl = (typeof obj.bgUrl === "string") ? obj.bgUrl : null; // ✅ 이 줄 추가
   state.nodes = Array.isArray(obj.nodes) ? obj.nodes : [];
   state.nodes.forEach(n=>{
     if(!n.prereqMode) n.prereqMode = "ALL";
@@ -1030,34 +1033,32 @@ cv.addEventListener("mousedown", (e)=>{
     return;
   }
 
-  // 빈 곳
-if(e.button === 0){
+  // ✅ 빈 곳 처리
+  if(e.button === 0){
 
-  // ✅ 안전장치: EDIT + (뷰어아님) + 좌클릭 + "진짜 빈 곳"일 때만 노드 생성 준비
-  if(state.mode === "EDIT" && !state.viewerMode){
-
-    // 선택이 남아있더라도, 실제 클릭 위치에 노드가 있으면 pendingAdd 금지
-    // (hitNode(w)가 null인 상태로 여기까지 내려온 거라 보통은 빈 곳이지만,
-    //  좌표 꼬임/경계값에서 재확인)
-    const again = hitNode(w);
-    if(!again){
-      state.pendingAdd = { sx, sy, wx: w.x, wy: w.y };
-    }else{
-      // 노드 위로 판정되면 생성 준비 대신 그냥 선택만 유지
-      state.pendingAdd = null;
+    // ✅ 안전장치: EDIT + (뷰어아님) + 좌클릭 + "진짜 빈 곳"일 때만 노드 생성 준비
+    if(state.mode === "EDIT" && !state.viewerMode){
+      if(!hitNode(w)){
+        state.pendingAdd = { sx, sy, wx: w.x, wy: w.y };
+      }else{
+        state.pendingAdd = null;
+      }
+      return;
     }
 
-  }else{
-    // SIM이거나 뷰어면 드래그는 화면이동만
+    // SIM/뷰어에서는 좌클릭 빈곳 = 화면이동 시작
     startPan(sx, sy);
+    return;
   }
-}
 
-
+  // 우클릭은 EDIT에서 화면이동
   if(state.mode === "EDIT" && e.button === 2){
     startPan(sx, sy);
+    return;
   }
 });
+
+
 
 cv.addEventListener("mousemove",(e)=>{
   const rect = cv.getBoundingClientRect();
@@ -1100,6 +1101,13 @@ cv.addEventListener("mouseup",(e)=>{
     const w = { x: state.pendingAdd.wx, y: state.pendingAdd.wy };
     state.pendingAdd = null;
 
+    // ✅ 안전장치: mouseup 시점에도 "빈 곳"인지 재확인
+    // (줌/드래그 중 좌표 오차나 경계에서 잘못 생성되는 걸 방지)
+    if(hitNode(w)){
+      stopAllDrag();
+      return;
+    }
+
     if(state.mode === "EDIT" && !state.viewerMode){
       const id = `N${String(state.nodes.length+1).padStart(3,"0")}`;
       const newNode = {
@@ -1119,6 +1127,7 @@ cv.addEventListener("mouseup",(e)=>{
 
   stopAllDrag();
 });
+
 
 cv.addEventListener("mouseleave", ()=>{
   stopAllDrag();
@@ -1211,8 +1220,15 @@ els.labelSize.addEventListener("input", ()=>{
 els.bgUrlInput.addEventListener("change", ()=>{
   if(state.viewerMode) return;
   const url = String(els.bgUrlInput.value || "").trim();
-  if(url) loadBgFromUrl(url, false);
+  if(!url) return;
+
+  // ✅ 입력한 URL을 상태에도 확실히 저장
+  state.bgUrl = url;
+
+  // ✅ 배경 로드
+  loadBgFromUrl(url, false);
 });
+
 
 // 배경 파일 업로드(로컬) → 편집 중에만(공유는 url 필요)
 els.bgFile.addEventListener("change", (e)=>{
@@ -1565,6 +1581,7 @@ els.loadJson.addEventListener("click", ()=>{
 </script>
 </body>
 </html>
+
 
 
 
