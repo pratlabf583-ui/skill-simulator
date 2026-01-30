@@ -120,11 +120,12 @@
 
 body{
   background-image: var(--bgImage);
-  background-size: calc(100% * var(--bgZoom)) auto;
+  background-size: calc(100% * var(--bgZoom)) calc(100% * var(--bgZoom));
   background-position: var(--bgX) var(--bgY);
   background-attachment: fixed;
   background-repeat: no-repeat;
 }
+
 
 
 /* ✅ 위에 올라가는 카드/박스는 살짝 반투명 */
@@ -463,19 +464,32 @@ body{
     // 카드에서 드래그하면 스크롤/텍스트 선택이 방해될 수 있어서,
     // Alt키 누르고 드래그할 때만 작동하게 함.
     document.addEventListener("mousedown", (e)=>{
-      if(!e.altKey) return;             // ✅ Alt + 드래그로만 이동
-      dragging = true;
-      startX = e.clientX;
-      startY = e.clientY;
+  if(!e.altKey) return;
 
-      // 드래그 시작 순간 현재 값을 기준으로
-      const sx = getComputedStyle(document.documentElement).getPropertyValue("--bgX").trim();
-      const sy = getComputedStyle(document.documentElement).getPropertyValue("--bgY").trim();
-      baseX = toPx(sx);
-      baseY = toPx(sy);
+  dragging = true;
+  startX = e.clientX;
+  startY = e.clientY;
 
-      e.preventDefault();
-    });
+  // 드래그 시작 순간 현재 값을 기준으로
+  const sx = getComputedStyle(document.documentElement).getPropertyValue("--bgX").trim();
+  const sy = getComputedStyle(document.documentElement).getPropertyValue("--bgY").trim();
+
+  // ✅ %면 화면 중심을 px로 계산해서 시작(점프 방지)
+  if(sx.endsWith("%")){
+    baseX = (window.innerWidth * (parseFloat(sx) / 100)) || 0;
+  }else{
+    baseX = toPx(sx);
+  }
+
+  if(sy.endsWith("%")){
+    baseY = (window.innerHeight * (parseFloat(sy) / 100)) || 0;
+  }else{
+    baseY = toPx(sy);
+  }
+
+  e.preventDefault();
+});
+
 
     document.addEventListener("mousemove", (e)=>{
       if(!dragging) return;
@@ -510,6 +524,7 @@ body{
 </script>
 </body>
 </html>
+
 
 
 
