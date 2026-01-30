@@ -667,7 +667,8 @@ function setViewerMode(on){
     els.shareInfo.textContent = "";
   }
 
-  draw();
+  // ✅ 레이아웃 바뀌면 캔버스 실제 픽셀 크기부터 다시 맞춰야 클릭 좌표가 안 틀어짐
+  resize();   // (resize 안에서 draw() 호출함)
 }
 
 function loadBgFromUrl(url, alsoSetInput=true){
@@ -1581,6 +1582,7 @@ els.loadJson.addEventListener("click", ()=>{
 </script>
 </body>
 </html>
+
 
 
 
