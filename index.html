@@ -1031,13 +1031,28 @@ cv.addEventListener("mousedown", (e)=>{
   }
 
   // 빈 곳
-  if(e.button === 0){
-    if(state.mode === "EDIT" && !state.viewerMode){
+if(e.button === 0){
+
+  // ✅ 안전장치: EDIT + (뷰어아님) + 좌클릭 + "진짜 빈 곳"일 때만 노드 생성 준비
+  if(state.mode === "EDIT" && !state.viewerMode){
+
+    // 선택이 남아있더라도, 실제 클릭 위치에 노드가 있으면 pendingAdd 금지
+    // (hitNode(w)가 null인 상태로 여기까지 내려온 거라 보통은 빈 곳이지만,
+    //  좌표 꼬임/경계값에서 재확인)
+    const again = hitNode(w);
+    if(!again){
       state.pendingAdd = { sx, sy, wx: w.x, wy: w.y };
     }else{
-      startPan(sx, sy);
+      // 노드 위로 판정되면 생성 준비 대신 그냥 선택만 유지
+      state.pendingAdd = null;
     }
+
+  }else{
+    // SIM이거나 뷰어면 드래그는 화면이동만
+    startPan(sx, sy);
   }
+}
+
 
   if(state.mode === "EDIT" && e.button === 2){
     startPan(sx, sy);
@@ -1550,6 +1565,7 @@ els.loadJson.addEventListener("click", ()=>{
 </script>
 </body>
 </html>
+
 
 
 
