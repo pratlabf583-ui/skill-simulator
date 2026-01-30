@@ -60,6 +60,38 @@ canvas{width:100%;height:100%;display:block;}
 .simLocked .hint {
   opacity: 0.35;
 }
+ /* =========================
+   ✅ 상단 메뉴 정리(그룹/구분선/톤)
+   ========================= */
+.topMenu{ gap:10px; }
+.menuGroup{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+
+.divider{
+  width:1px; height:28px;
+  background: var(--line);
+  opacity:.8;
+  margin:0 4px;
+}
+
+/* 버튼 톤 3종 */
+.btnPrimary{
+  border-color: rgba(120,185,255,0.8);
+}
+.btnPrimary:hover{
+  border-color: rgba(120,185,255,1);
+}
+
+.btnGhost{
+  opacity: .92;
+}
+
+.btnDanger{
+  border-color: rgba(255,77,77,0.55);
+}
+.btnDanger:hover{
+  border-color: rgba(255,77,77,0.95);
+}
+ 
 /* 공유(뷰어) 모드에서 편집 UI 숨김 */
 .viewerOnlyHide{display:none !important;}
 </style>
@@ -100,21 +132,37 @@ canvas{width:100%;height:100%;display:block;}
   </div>
 
   <div class="card" style="min-width:420px">
-    <div class="row" style="justify-content:flex-end; flex-wrap:wrap;">
-      <a class="btnLink" href="https://creators.nexon.com/kr/s/pramochi%238535" target="_blank" rel="noopener noreferrer">강모찌후원등록</a>
-      <a class="btnLink" href="./board.html" target="_blank" rel="noopener noreferrer">게시판</a>
-      
-      <button id="toggleMode">시뮬레이터 보기</button>
-      <button id="adminEdit">EDIT(관리자)</button>
+    <div class="row topMenu" style="justify-content:flex-end; flex-wrap:wrap;">
 
-      <button id="saveLinkBase">링크 저장(초기화)</button>
-      <button id="saveLinkBuild">링크 저장(내 빌드)</button>
+  <div class="menuGroup">
+    <a class="btnLink" href="https://creators.nexon.com/kr/s/pramochi%238535" target="_blank" rel="noopener noreferrer">강모찌후원등록</a>
+    <a class="btnLink" href="./board.html" target="_blank" rel="noopener noreferrer">게시판</a>
+  </div>
 
-      <button id="resetPoints">포인트 초기화</button>
-      <button id="retrySimPwd" style="display:none">비밀번호 재입력</button>
-      <button id="postBoard">게시판에 공유</button>
+  <div class="divider"></div>
 
-    </div>
+  <div class="menuGroup">
+    <button id="toggleMode">시뮬레이터 보기</button>
+    <button id="adminEdit" class="btnGhost">EDIT(관리자)</button>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="menuGroup">
+    <button id="saveLinkBase" class="btnGhost">링크 저장(초기화)</button>
+    <button id="saveLinkBuild" class="btnPrimary">링크 저장(내 빌드)</button>
+    <button id="postBoard" class="btnPrimary">게시판에 공유</button>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="menuGroup">
+    <button id="resetPoints" class="btnDanger">포인트 초기화</button>
+    <button id="retrySimPwd" class="btnGhost" style="display:none">비밀번호 재입력</button>
+  </div>
+
+</div>
+
 
     <div class="muted small" id="shareInfo" style="margin-top:6px"></div>
   </div>
@@ -1817,6 +1865,7 @@ els.loadJson.addEventListener("click", ()=>{
 </script>
 </body>
 </html>
+
 
 
 
