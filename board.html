@@ -109,12 +109,19 @@
       .item{flex-direction:column}
     }
    /* ✅ 전체 배경 이미지 */
+/* ✅ 전체 배경 이미지 (CSS 변수로 관리) */
+:root{
+  --bgImage: url("https://github.com/pratlabf583-ui/skill-simulator/blob/main/lee.jpg?raw=true");
+}
+
 body{
-  background-image: url("https://github.com/pratlabf583-ui/skill-simulator/blob/main/lee.jpg?raw=true");
+  background-image: var(--bgImage);
   background-size: cover;          /* 화면 꽉 채우기 */
   background-position: center;     /* 중앙 정렬 */
   background-attachment: fixed;    /* 스크롤해도 고정 */
   background-repeat: no-repeat;
+}
+
 }
 
 /* ✅ 위에 올라가는 카드/박스는 살짝 반투명 */
@@ -153,6 +160,17 @@ body{
         <button id="reload">새로고침</button>
       </div>
       <div class="muted" id="status" style="margin-top:8px"></div>
+      <div class="hr"></div>
+<div class="kpi" style="font-size:14px">배경 설정(내 PC에 저장)</div>
+<div class="row" style="margin-top:8px">
+  <input id="bgUrlInput" placeholder="배경 이미지 URL (raw 링크)" style="flex:1;min-width:220px">
+  <button id="bgApply">적용/저장</button>
+  <button id="bgReset">기본</button>
+</div>
+<div class="muted small" style="margin-top:6px">
+  ※ 이 설정은 이 브라우저에만 저장됩니다.
+</div>
+
     </div>
   </div>
 
@@ -356,7 +374,53 @@ body{
 
   // 시작
   loadPosts();
+    /** =========================
+   * ✅ 배경 이미지 URL localStorage 저장/불러오기
+   * (board.html 전용)
+   * ========================= */
+  (function bgLocalStorageInit(){
+    const KEY = "board_bg_url"; // 저장 키(이름)
+    const DEFAULT_BG = "https://github.com/pratlabf583-ui/skill-simulator/blob/main/lee.jpg?raw=true";
+
+    // 저장된 값 있으면 적용, 없으면 기본값
+    const saved = localStorage.getItem(KEY);
+    const url = (saved && saved.trim()) ? saved.trim() : DEFAULT_BG;
+
+    // CSS 변수로 배경 적용
+    document.documentElement.style.setProperty("--bgImage", `url("${url}")`);
+
+    // (선택) 입력칸/버튼이 있을 때만 동작
+    const input = document.getElementById("bgUrlInput");
+    const applyBtn = document.getElementById("bgApply");
+    const resetBtn = document.getElementById("bgReset");
+
+    if(input) input.value = url;
+
+    if(applyBtn && input){
+      applyBtn.addEventListener("click", ()=>{
+        const v = (input.value || "").trim();
+        if(!v){
+          alert("이미지 URL을 입력해줘!");
+          return;
+        }
+        localStorage.setItem(KEY, v);
+        document.documentElement.style.setProperty("--bgImage", `url("${v}")`);
+        alert("✅ 배경 저장 완료! 다음에 들어와도 유지돼.");
+      });
+    }
+
+    if(resetBtn){
+      resetBtn.addEventListener("click", ()=>{
+        localStorage.removeItem(KEY);
+        document.documentElement.style.setProperty("--bgImage", `url("${DEFAULT_BG}")`);
+        if(input) input.value = DEFAULT_BG;
+        alert("✅ 기본 배경으로 복구했어.");
+      });
+    }
+  })();
+
 </script>
 </body>
 </html>
+
 
