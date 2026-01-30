@@ -193,8 +193,17 @@ canvas{width:100%;height:100%;display:block;}
   <div class="divider"></div>
 
   <div class="menuGroup">
+  <select id="jobQuickSelect" style="min-width:170px">
+    <option value="">직업 선택</option>
+    <option value="심연추방자">심연추방자</option>
+    <option value="태양감시자">태양감시자</option>
+    <option value="향사수">향사수</option>
+    <option value="환영검사">환영검사</option>
+    <option value="집행관">집행관</option>
+    <option value="주문각인사">주문각인사</option>
+  </select>
+</div>
 
-  </div>
 
   <div class="divider"></div>
 
@@ -2047,11 +2056,123 @@ else setSimLocked(false);
 
   // 공유자면 처음 한번 비번 요청(자동 팝업 원하면 아래 주석 해제)
   if(state.viewerMode){ askSimPassword(); }
+// ✅ 직업별 템플릿 share id 매핑 (네가 만든 템플릿 id로 교체)
+const JOB_TEMPLATE_ID = {
+  "심연추방자": "여기에_id",
+  "태양감시자": "여기에_id",
+  "향사수": "여기에_id",
+  "환영검사": "여기에_id",
+  "집행관": "여기에_id",
+  "주문각인사": "여기에_id",
+};
+
+async function loadJobTemplate(jobName){
+  const tid = JOB_TEMPLATE_ID[jobName];
+  if(!tid){
+    alert("❌ 이 직업 템플릿 id가 아직 등록되지 않았어.");
+    return;
+  }
+
+  try{
+    els.shareInfo.textContent = "불러오는 중...";
+    const payload = await loadFromDB(tid);
+    applyPack(payload);
+
+    // 공유 모드로 들어온 상태라면 유지
+    if(state.viewerMode) {
+      state.mode = "SIM";
+      // 잠금상태는 그대로 유지(원하면 여기서 잠그거나 풀 수도 있음)
+    }
+
+    resize();
+    draw();
+    els.shareInfo.textContent = `✅ ${jobName} 템플릿 로드 완료`;
+  }catch(e){
+    console.error(e);
+    els.shareInfo.textContent = "❌ 템플릿 로드 실패";
+    alert("❌ 템플릿을 불러오지 못했어. id가 맞는지 확인해줘.");
+  }
+}
+// ✅ 직업별 템플릿 share id (네가 준 링크 그대로)
+const JOB_TEMPLATE_ID = {
+  "집행관": "gv4xgwwbrw",
+  "향사수": "ylpsiqhtwu",
+  "태양감시자": "0244xlboy1",
+  "환영검사": "8es211i3ly",
+  "심연추방자": "t3l3k70wih",
+  "주문각인사": "umw93nhvnu",
+};
+
+async function loadJobTemplate(jobName){
+  const tid = JOB_TEMPLATE_ID[jobName];
+  if(!tid){
+    alert("❌ 이 직업 템플릿이 등록되지 않았어.");
+    return;
+  }
+
+  try{
+    els.shareInfo.textContent = "불러오는 중...";
+    const payload = await loadFromDB(tid);
+    applyPack(payload);
+
+    // 공유 모드면 SIM 유지
+    if(state.viewerMode) state.mode = "SIM";
+
+    resize();
+    draw();
+    els.shareInfo.textContent = `✅ ${jobName} 템플릿 로드 완료`;
+  }catch(e){
+    console.error(e);
+    els.shareInfo.textContent = "❌ 템플릿 로드 실패";
+    alert("❌ 템플릿을 불러오지 못했어. id가 맞는지/DB 접근 가능한지 확인해줘.");
+  }
+}
+
+// ✅ 상단 드롭다운 이벤트 연결
+const jobQuickSelect = document.getElementById("jobQuickSelect");
+if(jobQuickSelect){
+  jobQuickSelect.addEventListener("change", async ()=>{
+    const job = jobQuickSelect.value;
+    if(!job) return;
+
+    // 현재 포인트 찍어둔 상태면 덮어쓰기 경고
+    if(typeof getUsed === "function" && getUsed() > 0){
+      const ok = confirm("현재 찍은 포인트가 있습니다.\n템플릿을 불러오면 현재 상태가 덮어씌워집니다.\n계속할까요?");
+      if(!ok){
+        jobQuickSelect.value = "";
+        return;
+      }
+    }
+
+    await loadJobTemplate(job);
+  });
+}
+
+// ✅ 상단 드롭다운 이벤트
+const jobQuickSelect = document.getElementById("jobQuickSelect");
+if(jobQuickSelect){
+  jobQuickSelect.addEventListener("change", async ()=>{
+    const job = jobQuickSelect.value;
+    if(!job) return;
+
+    // (선택) 포인트 찍힌 상태를 지울지 물어보기
+    if(getUsed() > 0){
+      const ok = confirm("현재 찍은 포인트가 있습니다.\n템플릿을 불러오면 현재 상태가 덮어씌워집니다.\n계속할까요?");
+      if(!ok){
+        jobQuickSelect.value = "";
+        return;
+      }
+    }
+
+    await loadJobTemplate(job);
+  });
+}
 
 })();
 </script>
 </body>
 </html>
+
 
 
 
