@@ -1196,13 +1196,10 @@ cv.addEventListener("mousedown", (e)=>{
       // ✅ 잠김이면: 상태문구 + 모달 자동오픈 (더 친절)
 if(state.viewerMode && state.mode === "SIM" && state.simLocked){
   els.status.textContent = "🔒 비밀번호가 필요합니다. (후원코드 입력)";
-  els.status.style.color = "#ff6b6b";
-  draw();
+els.status.style.color = "#ff6b6b";
+askSimPassword();
+return;
 
-  // ★ 자동으로 모달 띄우기
-  askSimPassword();   // (prompt가 아니라 모달 openSimPwdModal()이 열리는 상태여야 함)
-  return;
-}
 
 
       // SIM 포인트 조작 (+ 선행 AND + 배타)
@@ -1992,6 +1989,7 @@ els.loadJson.addEventListener("click", ()=>{
 </script>
 </body>
 </html>
+
 
 
 
