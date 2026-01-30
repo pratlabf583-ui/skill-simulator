@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>전승 트리 게시판 - 강모찌 시뮬레이터</title>
+  <style>
+    :root{
+      --bg:#0b0f17; --card:#121a27; --text:#e8eefc;
+      --muted:#9bb0d0; --line:#23324a; --danger:#ff4d4d;
+      --ok:#7CFF6B; --accent:#78b9ff;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;background:var(--bg);color:var(--text);
+      font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;
+    }
+    a{color:inherit}
+    .wrap{max-width:1100px;margin:0 auto;padding:16px;}
+    .card{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:14px;
+    }
+    .top{
+      display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;
+      justify-content:space-between;margin-bottom:12px;
+    }
+    .kpi{font-size:18px;font-weight:900}
+    .muted{color:var(--muted);font-size:13px;white-space:pre-wrap}
+    button,input,select{
+      background:#0f1624;color:var(--text);
+      border:1px solid var(--line);border-radius:10px;padding:8px 12px;
+    }
+    button:hover{border-color:#3a527a;cursor:pointer;}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:12px;
+    }
+    .pill{
+      display:inline-flex;align-items:center;gap:6px;
+      border:1px solid var(--line);
+      background:#0f1624;color:var(--muted);
+      border-radius:999px;
+      padding:6px 10px;
+      font-size:12px;
+    }
+    .list{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:10px;
+    }
+    .item{
+      display:flex;gap:12px;align-items:flex-start;
+      padding:12px;border:1px solid var(--line);border-radius:14px;
+      background:#0f1624;
+    }
+    .item:hover{border-color:#3a527a}
+    .itemMain{flex:1;min-width:0}
+    .title{
+      font-weight:900;font-size:16px;line-height:1.25;
+      word-break:break-word;
+    }
+    .meta{
+      margin-top:6px;
+      display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+      color:var(--muted);font-size:12px;
+    }
+    .desc{
+      margin-top:8px;color:var(--text);opacity:.92;
+      font-size:13px;line-height:1.45;word-break:break-word;
+    }
+    .right{
+      display:flex;flex-direction:column;gap:8px;align-items:flex-end;
+      min-width:120px;
+    }
+    .badge{
+      border:1px solid var(--line);
+      background:rgba(0,0,0,.35);
+      border-radius:999px;
+      padding:6px 10px;
+      font-size:12px;
+      color:var(--muted);
+      white-space:nowrap;
+    }
+    .badge.ok{color:var(--ok);border-color:rgba(124,255,107,0.35)}
+    .badge.accent{color:var(--accent);border-color:rgba(120,185,255,0.35)}
+    .btnLink{
+      display:inline-flex;align-items:center;justify-content:center;
+      text-decoration:none;
+      background:#0f1624;
+      color:var(--text);
+      border:1px solid var(--line);
+      border-radius:10px;
+      padding:8px 12px;
+      white-space:nowrap;
+    }
+    .btnLink:hover{border-color:#3a527a}
+    .hr{border-top:1px solid var(--line);margin:12px 0}
+    .empty{
+      text-align:center;padding:24px;color:var(--muted);
+      border:1px dashed var(--line);border-radius:14px;
+    }
+    @media (max-width: 640px){
+      .right{align-items:flex-start;min-width:auto}
+      .item{flex-direction:column}
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <div class="card" style="flex:1;min-width:280px">
+      <div class="kpi">전승 트리 게시판</div>
+      <div class="muted" id="sub">
+- 최신 등록된 트리들을 보여줍니다.
+- 글 클릭 → 해당 트리 공유 링크로 이동합니다.
+      </div>
+      <div class="row" style="margin-top:10px">
+        <a class="btnLink" id="goSim" href="./" title="시뮬레이터로 이동">시뮬레이터로</a>
+        <span class="pill" id="countPill">로딩중…</span>
+      </div>
+    </div>
+
+    <div class="card" style="min-width:280px;flex:1">
+      <div class="kpi">검색/필터</div>
+      <div class="row" style="margin-top:10px">
+        <input id="q" placeholder="닉네임/제목/직업/설명 검색" style="flex:1;min-width:220px">
+      </div>
+      <div class="row" style="margin-top:10px">
+        <select id="jobFilter" style="flex:1;min-width:220px">
+          <option value="">직업 전체</option>
+        </select>
+        <button id="reload">새로고침</button>
+      </div>
+      <div class="muted" id="status" style="margin-top:8px"></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div class="kpi" style="font-size:16px">목록</div>
+        <div class="muted">최신순</div>
+      </div>
+      <div class="hr"></div>
+      <div class="list" id="list"></div>
+      <div class="empty" id="empty" style="display:none">아직 게시글이 없습니다.</div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+  /** =========================
+   * ✅ Supabase 설정 (시뮬레이터와 동일)
+   * ========================= */
+  const SUPABASE_URL = "https://ytzggylozlcgcaoaupwo.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_rZtoLYXkC53jwHycEzC2ZQ_RW82bspa";
+  const SB = window.supabase;
+
+  if (!SB || typeof SB.createClient !== "function") {
+    alert("Supabase 라이브러리 로드 실패(차단/오프라인). Ctrl+F5 해보고, 애드블록/보안프로그램 확인!");
+    throw new Error("Supabase SDK not loaded");
+  }
+
+  const sbClient = SB.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const els = {
+    list: document.getElementById("list"),
+    empty: document.getElementById("empty"),
+    q: document.getElementById("q"),
+    jobFilter: document.getElementById("jobFilter"),
+    reload: document.getElementById("reload"),
+    status: document.getElementById("status"),
+    countPill: document.getElementById("countPill"),
+    goSim: document.getElementById("goSim"),
+  };
+
+  // 현재 board.html이 있는 폴더 기준으로 시뮬레이터 주소 맞추기
+  // (루트에 board.html 두면 "./" 가 index.html로 감)
+  els.goSim.href = "./";
+
+  let allPosts = [];     // 전체 posts
+  let viewPosts = [];    // 필터된 posts
+
+  function fmtTime(iso){
+    try{
+      const d = new Date(iso);
+      const yy = d.getFullYear();
+      const mm = String(d.getMonth()+1).padStart(2,"0");
+      const dd = String(d.getDate()).padStart(2,"0");
+      const hh = String(d.getHours()).padStart(2,"0");
+      const mi = String(d.getMinutes()).padStart(2,"0");
+      return `${yy}-${mm}-${dd} ${hh}:${mi}`;
+    }catch(e){
+      return iso || "";
+    }
+  }
+
+  function escapeHtml(s){
+    return String(s ?? "")
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#39;");
+  }
+
+  function buildShareUrl(shareId){
+    // 시뮬레이터 페이지가 같은 폴더/루트라고 가정:
+    // index.html?id=xxxxx 형태로 이동
+    const base = location.origin + location.pathname.replace(/board\.html$/i, "");
+    return base + "?id=" + encodeURIComponent(shareId);
+  }
+
+  function render(){
+    const list = els.list;
+    list.innerHTML = "";
+
+    if(!viewPosts.length){
+      els.empty.style.display = "block";
+      els.countPill.textContent = "0개";
+      return;
+    }
+    els.empty.style.display = "none";
+    els.countPill.textContent = `${viewPosts.length}개`;
+
+    for(const p of viewPosts){
+      const shareUrl = buildShareUrl(p.share_id);
+      const nickname = escapeHtml(p.nickname);
+      const title = escapeHtml(p.title);
+      const job = escapeHtml(p.job);
+      const desc = escapeHtml(p.desc || "");
+      const sp = Number(p.sp ?? 0);
+      const time = fmtTime(p.created_at);
+
+      const el = document.createElement("a");
+      el.className = "item";
+      el.href = shareUrl;
+      el.target = "_blank";
+      el.rel = "noopener noreferrer";
+      el.style.textDecoration = "none";
+
+      el.innerHTML = `
+        <div class="itemMain">
+          <div class="title">${title}</div>
+          <div class="meta">
+            <span class="badge accent">직업: ${job || "-"}</span>
+            <span class="badge">닉네임: ${nickname || "-"}</span>
+            <span class="badge">등록: ${escapeHtml(time)}</span>
+          </div>
+          ${desc ? `<div class="desc">${desc}</div>` : ""}
+        </div>
+        <div class="right">
+          <span class="badge ok">포인트: ${sp}</span>
+          <span class="btnLink">트리 열기</span>
+        </div>
+      `;
+      list.appendChild(el);
+    }
+  }
+
+  function applyFilter(){
+    const q = (els.q.value || "").trim().toLowerCase();
+    const jf = (els.jobFilter.value || "").trim().toLowerCase();
+
+    viewPosts = allPosts.filter(p=>{
+      const job = String(p.job || "").toLowerCase();
+      const hay = [
+        p.nickname, p.title, p.job, p.desc
+      ].map(x=>String(x||"").toLowerCase()).join(" ");
+
+      if(jf && job !== jf) return false;
+      if(q && !hay.includes(q)) return false;
+      return true;
+    });
+
+    render();
+  }
+
+  function fillJobFilter(){
+    const set = new Set();
+    for(const p of allPosts){
+      const j = String(p.job || "").trim();
+      if(j) set.add(j);
+    }
+    const jobs = [...set].sort((a,b)=>a.localeCompare(b,"ko"));
+
+    // 기존 옵션 초기화 (첫번째 "전체" 유지)
+    els.jobFilter.innerHTML = `<option value="">직업 전체</option>`;
+    for(const j of jobs){
+      const opt = document.createElement("option");
+      opt.value = j;
+      opt.textContent = j;
+      els.jobFilter.appendChild(opt);
+    }
+  }
+
+  async function loadPosts(){
+    els.status.textContent = "불러오는 중…";
+    els.status.style.color = "#9bb0d0";
+
+    try{
+      // posts 테이블에서 최신순으로 200개까지
+      const { data, error } = await sbClient
+        .from("posts")
+        .select("id, created_at, nickname, title, job, sp, desc, share_id")
+        .order("created_at", { ascending: false })
+        .limit(200);
+
+      if(error) throw error;
+
+      allPosts = Array.isArray(data) ? data : [];
+      fillJobFilter();
+      applyFilter();
+
+      els.status.textContent = allPosts.length
+        ? `✅ 로드 완료 (${allPosts.length}개)`
+        : "ℹ️ 게시글이 아직 없습니다.";
+      els.status.style.color = "#9bb0d0";
+    }catch(e){
+      console.error(e);
+      els.status.textContent = "❌ 로드 실패! (Supabase RLS/테이블/키 확인)";
+      els.status.style.color = "#ff6b6b";
+      allPosts = [];
+      viewPosts = [];
+      render();
+    }
+  }
+
+  // 이벤트
+  els.q.addEventListener("input", applyFilter);
+  els.jobFilter.addEventListener("change", applyFilter);
+  els.reload.addEventListener("click", loadPosts);
+
+  // 시작
+  loadPosts();
+</script>
+</body>
+</html>
