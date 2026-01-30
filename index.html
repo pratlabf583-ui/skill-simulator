@@ -1585,6 +1585,9 @@ function submitSimPwd(){
   // 성공
   spmSetState("✅ 잠금 해제 완료!", "");
   state.simUnlockedOnce = true;
+  // ✅ 이번 탭(세션) 동안은 다시 안 묻게 저장
+sessionStorage.setItem("SIM_UNLOCKED", "1");
+
   setSimLocked(false);
   draw();
   closeSimPwdModal();
@@ -1991,7 +1994,14 @@ els.loadJson.addEventListener("click", ()=>{
         setViewerMode(true);
 
         // 공유 SIM은 기본 잠금
-        if(!state.simUnlockedOnce) setSimLocked(true);
+        // ✅ 세션에 잠금해제 기록 있으면 잠그지 않음
+const remembered = sessionStorage.getItem("SIM_UNLOCKED") === "1";
+state.simUnlockedOnce = state.simUnlockedOnce || remembered;
+
+// 공유 SIM은 기본 잠금
+if(!state.simUnlockedOnce) setSimLocked(true);
+else setSimLocked(false);
+
 
         resize();
         draw();
@@ -2011,10 +2021,14 @@ els.loadJson.addEventListener("click", ()=>{
   if(has){
     setViewerMode(true);
 
-    // 공유 SIM은 기본 잠금
-    if(!state.simUnlockedOnce){
-      setSimLocked(true);
-    }
+    // ✅ 세션에 잠금해제 기록 있으면 잠그지 않음
+const remembered = sessionStorage.getItem("SIM_UNLOCKED") === "1";
+state.simUnlockedOnce = state.simUnlockedOnce || remembered;
+
+// 공유 SIM은 기본 잠금
+if(!state.simUnlockedOnce) setSimLocked(true);
+else setSimLocked(false);
+
   }else{
     // 기본은 편집자
     setViewerMode(false);
@@ -2035,6 +2049,7 @@ els.loadJson.addEventListener("click", ()=>{
 </script>
 </body>
 </html>
+
 
 
 
