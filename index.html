@@ -1197,6 +1197,14 @@ cv.addEventListener("mousedown", (e)=>{
 
   const node = hitNode(w);
 
+  // ✅ 공유 SIM + 잠김 + 노드 클릭 → 비번 모달
+  if(state.viewerMode && state.mode === "SIM" && state.simLocked && node){
+    els.status.textContent = "🔒 비밀번호가 필요합니다. (후원코드 입력)";
+    els.status.style.color = "#ff6b6b";
+    askSimPassword();
+    return;
+  }
+
   if(node){
     state.selected = node.id;
 
@@ -1208,16 +1216,6 @@ cv.addEventListener("mousedown", (e)=>{
         state.dragOff.y = w.y - node.y;
       }
     }else{
-      // ✅ 잠김이면: 상태문구 + 모달 자동오픈 (더 친절)
-if(state.viewerMode && state.mode === "SIM" && state.simLocked){
-  els.status.textContent = "🔒 비밀번호가 필요합니다. (후원코드 입력)";
-els.status.style.color = "#ff6b6b";
-askSimPassword();
-return;
-}
-
-
-      // SIM 포인트 조작 (+ 선행 AND + 배타)
       if(e.button === 0){
         const check = canIncrease(node.id);
         if(check.ok){
@@ -1244,10 +1242,8 @@ return;
     return;
   }
 
-  // ✅ 빈 곳 처리
+  // 빈 곳 클릭
   if(e.button === 0){
-
-    // ✅ 안전장치: EDIT + (뷰어아님) + 좌클릭 + "진짜 빈 곳"일 때만 노드 생성 준비
     if(state.mode === "EDIT" && !state.viewerMode){
       if(!hitNode(w)){
         state.pendingAdd = { sx, sy, wx: w.x, wy: w.y };
@@ -1256,18 +1252,16 @@ return;
       }
       return;
     }
-
-    // SIM/뷰어에서는 좌클릭 빈곳 = 화면이동 시작
     startPan(sx, sy);
     return;
   }
 
-  // 우클릭은 EDIT에서 화면이동
   if(state.mode === "EDIT" && e.button === 2){
     startPan(sx, sy);
     return;
   }
 });
+
 
 
 
@@ -2004,6 +1998,7 @@ els.loadJson.addEventListener("click", ()=>{
 </script>
 </body>
 </html>
+
 
 
 
