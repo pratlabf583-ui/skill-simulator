@@ -1193,13 +1193,17 @@ cv.addEventListener("mousedown", (e)=>{
         state.dragOff.y = w.y - node.y;
       }
     }else{
-      // ✅ 잠김이면 노드 포인트 조작 막기 (화면 이동은 가능)
-      if(state.viewerMode && state.mode === "SIM" && state.simLocked){
-        els.status.textContent = "🔒 비밀번호 입력 후 노드 조작이 가능합니다. (비밀번호 입력 버튼 눌러주세요)";
-        els.status.style.color = "#ff6b6b";
-        draw();
-        return;
-      }
+      // ✅ 잠김이면: 상태문구 + 모달 자동오픈 (더 친절)
+if(state.viewerMode && state.mode === "SIM" && state.simLocked){
+  els.status.textContent = "🔒 비밀번호가 필요합니다. (후원코드 입력)";
+  els.status.style.color = "#ff6b6b";
+  draw();
+
+  // ★ 자동으로 모달 띄우기
+  askSimPassword();   // (prompt가 아니라 모달 openSimPwdModal()이 열리는 상태여야 함)
+  return;
+}
+
 
       // SIM 포인트 조작 (+ 선행 AND + 배타)
       if(e.button === 0){
@@ -1586,9 +1590,11 @@ function openBoardModal(){
   }
   // ✅ 공유모드라도 비번 잠금이면 금지
   if(state.simLocked){
-    alert("🔒 비밀번호를 먼저 입력해야 게시판에 등록할 수 있어요. (비밀번호 입력 버튼 누르기)");
-    return;
-  }
+  bmSetState("🔒 비밀번호를 먼저 입력해야 등록할 수 있어요.", "err");
+  askSimPassword(); // 자동으로 비번 모달 오픈
+  return;
+}
+
 
   // 입력 초기화(원하면 닉네임만 유지하도록 바꿔도 됨)
   bm.nickname.value = "";
@@ -1986,6 +1992,7 @@ els.loadJson.addEventListener("click", ()=>{
 </script>
 </body>
 </html>
+
 
 
 
