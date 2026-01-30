@@ -158,7 +158,7 @@ canvas{width:100%;height:100%;display:block;}
 
   <div class="menuGroup">
     <button id="resetPoints" class="btnDanger">포인트 초기화</button>
-    <button id="retrySimPwd" class="btnGhost" style="display:none">비밀번호 재입력</button>
+    <button id="retrySimPwd" class="btnGhost" style="display:none">비밀번호 입력</button>
   </div>
 
 </div>
@@ -612,7 +612,7 @@ function setSimLocked(on){
 
   // 상태 문구(여기서 찍어주고, updateTop에서 잠김이면 덮어쓰지 않게 처리)
   if(on){
-    els.status.textContent = "🔒 비밀번호 입력 후 노드 조작이 가능합니다. (화면 이동/줌은 가능)  → 비밀번호 재입력 버튼";
+    els.status.textContent = "🔒 비밀번호 입력 후 노드 조작이 가능합니다. (화면 이동/줌은 가능)  → 비밀번호 입력 버튼";
     els.status.style.color = "#ff6b6b";
   }else{
     els.status.textContent = "✅ 잠금 해제됨";
@@ -1151,7 +1151,7 @@ cv.addEventListener("mousedown", (e)=>{
     }else{
       // ✅ 잠김이면 노드 포인트 조작 막기 (화면 이동은 가능)
       if(state.viewerMode && state.mode === "SIM" && state.simLocked){
-        els.status.textContent = "🔒 비밀번호 입력 후 노드 조작이 가능합니다. (비밀번호 재입력 버튼 눌러주세요)";
+        els.status.textContent = "🔒 비밀번호 입력 후 노드 조작이 가능합니다. (비밀번호 입력 버튼 눌러주세요)";
         els.status.style.color = "#ff6b6b";
         draw();
         return;
@@ -1466,7 +1466,7 @@ function openBoardModal(){
   }
   // ✅ 공유모드라도 비번 잠금이면 금지
   if(state.simLocked){
-    alert("🔒 비밀번호를 먼저 입력해야 게시판에 등록할 수 있어요. (비밀번호 재입력 버튼 누르기)");
+    alert("🔒 비밀번호를 먼저 입력해야 게시판에 등록할 수 있어요. (비밀번호 입력 버튼 누르기)");
     return;
   }
 
@@ -1865,6 +1865,7 @@ els.loadJson.addEventListener("click", ()=>{
 </script>
 </body>
 </html>
+
 
 
 
