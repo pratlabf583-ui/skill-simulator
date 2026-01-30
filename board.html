@@ -108,6 +108,21 @@
       .right{align-items:flex-start;min-width:auto}
       .item{flex-direction:column}
     }
+   /* ✅ 전체 배경 이미지 */
+body{
+  background-image: url("https://github.com/pratlabf583-ui/skill-simulator/blob/main/lee.jpg?raw=true");
+  background-size: cover;          /* 화면 꽉 채우기 */
+  background-position: center;     /* 중앙 정렬 */
+  background-attachment: fixed;    /* 스크롤해도 고정 */
+  background-repeat: no-repeat;
+}
+
+/* ✅ 위에 올라가는 카드/박스는 살짝 반투명 */
+.card{
+  background: rgba(18,26,39,0.88);
+  backdrop-filter: blur(6px);
+}
+ 
   </style>
 </head>
 <body>
@@ -344,3 +359,4 @@
 </script>
 </body>
 </html>
+
