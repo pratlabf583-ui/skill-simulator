@@ -1118,23 +1118,22 @@ cv.addEventListener("wheel",(e)=>{
   const sx = e.clientX - rect.left;
   const sy = e.clientY - rect.top;
 
-  // 줌 기준점(마우스 위치)
+  // 줌 이전 마우스가 가리키는 월드좌표
   const before = screenToWorld(sx, sy);
 
+  // 스케일 변경
   const delta = -Math.sign(e.deltaY);
   const factor = (delta > 0) ? 1.08 : 1/1.08;
   const nextScale = clamp(state.scale * factor, 0.2, 3.0);
-
   state.scale = nextScale;
 
-  const after = screenToWorld(sx, sy);
-
-  // 마우스 위치가 같은 월드좌표를 가리키도록 tx/ty 보정
-  state.tx += (after.x - before.x) * state.scale;
-  state.ty += (after.y - before.y) * state.scale;
+  // ✅ 핵심: "마우스 위치가 같은 월드좌표"를 가리키도록 tx/ty를 정석으로 재계산
+  state.tx = sx - before.x * state.scale;
+  state.ty = sy - before.y * state.scale;
 
   draw();
 },{ passive:false });
+
 
 /** =========================
  *  UI 버튼/입력 이벤트
@@ -1551,6 +1550,7 @@ els.loadJson.addEventListener("click", ()=>{
 </script>
 </body>
 </html>
+
 
 
 
