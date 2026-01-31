@@ -524,7 +524,8 @@ const stage = document.getElementById("stage");
 
 const state = {
   seasonMax: 162,
-  mode: "EDIT",
+  mode: "SIM",   // ✅ 기본은 SIM
+
   owned: 145,
   nodes: [],
   edges: [],
@@ -2102,9 +2103,12 @@ if(!state.simUnlockedOnce) setSimLocked(true);
 else setSimLocked(false);
 
   }else{
-    // 기본은 편집자
-    setViewerMode(false);
-  }
+  // ✅ 기본은 뷰어(SIM). EDIT는 관리자 비번으로만 들어감
+  setViewerMode(true);
+  state.mode = "SIM";
+  setSimLocked(false);   // ✅ 기본 페이지에서는 SIM 비번 팝업 안 띄움
+}
+
 
   // 초기 보유값 반영
   state.owned = clamp(Number(els.ownedSp.value || 0), 0, state.seasonMax);
@@ -2115,7 +2119,11 @@ else setSimLocked(false);
   draw();
 
   // 공유자면 처음 한번 비번 요청(자동 팝업 원하면 아래 주석 해제)
-  if(state.viewerMode){ askSimPassword(); }
+  // ✅ 공유 링크(해시로 들어온 경우)만 자동 비번 팝업
+if(has){
+  askSimPassword();
+}
+
 
 
 
@@ -2123,6 +2131,7 @@ else setSimLocked(false);
 </script>
 </body>
 </html>
+
 
 
 
