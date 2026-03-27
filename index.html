@@ -54,9 +54,7 @@ canvas{width:100%;height:100%;display:block;}
 .small{font-size:12px}
 .btnWide{width:100%}
 /* 🔒 SIM 잠김(비번 전) 흐림 처리 */
-.simLocked #cv {
-  filter: blur(2px) brightness(0.75);
-}
+
 .simLocked .hint {
   opacity: 0.35;
 }
@@ -217,7 +215,6 @@ canvas{width:100%;height:100%;display:block;}
 
   <div class="menuGroup">
     <button id="resetPoints" class="btnDanger">포인트 초기화</button>
-    <button id="retrySimPwd" class="btnGhost" style="display:none">비밀번호 입력</button>
   </div>
 
 </div>
@@ -231,9 +228,6 @@ canvas{width:100%;height:100%;display:block;}
 
   <div class="card">
     <div class="stage" id="stage">
-     <div id="lockBanner" class="lockBanner" style="display:none">
-  🔒 비밀번호 입력 후 노드 조작이 가능합니다. (화면 이동/줌은 가능) · <b>비밀번호 입력</b> 버튼을 눌러주세요.
-</div>
  
       <div class="toolbar">
         <input id="bgUrlInput" class="editUI" placeholder="배경 이미지 URL 붙여넣기 (공유용)" style="width:320px">
@@ -386,50 +380,7 @@ canvas{width:100%;height:100%;display:block;}
   </div>
 </div>
 <!-- =========================
-     ✅ SIM 비밀번호 입력 모달
-     ========================= -->
-<div id="simPwdBackdrop" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:10000;">
-  <div id="simPwdModal" style="
-  max-width:720px;
-  margin:10vh auto;
-  background:#121a27;
-  border:1px solid #23324a;
-  border-radius:20px;
-  padding:22px 22px 18px;
-  box-shadow: 0 18px 60px rgba(0,0,0,.55);
-">
-
-    <div class="row" style="justify-content:space-between; align-items:center;">
-      <div class="kpi" style="font-size:22px">비밀번호 입력</div>
-      <button id="simPwdClose" style="padding:6px 10px">✕</button>
-    </div>
-
-    <div class="muted small" style="margin-top:8px">
-      강모찌 후원코드를 입력하면 잠금이 해제됩니다.
-    </div>
-
-    <div class="hr"></div>
-
-    <div class="muted">비밀번호</div>
-    <input id="simPwdInput" type="text" placeholder="답) pramochi#8535" style="
-  width:100%;
-  font-size:18px;
-  padding:14px 14px;
-  border-radius:14px;
-">
-
-
-    <div class="row" style="justify-content:space-between; margin-top:12px">
-      <div class="muted small" id="simPwdState"></div>
-      <div class="row">
-        <button id="simPwdCancel">취소</button>
-        <button id="simPwdSubmit" class="btnPrimary">확인</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-  
+ 
 
 <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://unpkg.com/lz-string@1.4.4/libs/lz-string.min.js"></script>
@@ -506,7 +457,6 @@ async function loadFromDB(id){
  *  ========================= */
 const ADMIN_PASSWORD = "dkgus12";
 // ✅ SIM(공유) 비밀번호
-const SIM_PASSWORD = "pramochi#8535";
   // ✅ 직업별 템플릿(= shares 테이블에 저장된 id) 매핑
 const JOB_TEMPLATE_ID = {
   "집행관": "gv4xgwwbrw",
@@ -561,6 +511,8 @@ const state = {
   simLocked: false,
   simUnlockedOnce: false,
 };
+  state.simLocked = false;
+state.simUnlockedOnce = true;
 
 const els = {
   subtitle: document.getElementById("subtitle"),
@@ -1296,12 +1248,6 @@ cv.addEventListener("mousedown", (e)=>{
   const node = hitNode(w);
 
   // ✅ 공유 SIM + 잠김 + 노드 클릭 → 비번 모달
-  if(state.viewerMode && state.mode === "SIM" && state.simLocked && node){
-    els.status.textContent = "🔒 비밀번호가 필요합니다. (후원코드 입력)";
-    els.status.style.color = "#ff6b6b";
-    askSimPassword();
-    return;
-  }
 
   if(node){
     state.selected = node.id;
@@ -1605,88 +1551,6 @@ const bm = {
 // =========================
 // ✅ SIM 비밀번호 모달 핸들러 (prompt 대체)
 // =========================
-const spm = {
-  backdrop: document.getElementById("simPwdBackdrop"),
-  close: document.getElementById("simPwdClose"),
-  cancel: document.getElementById("simPwdCancel"),
-  submit: document.getElementById("simPwdSubmit"),
-  input: document.getElementById("simPwdInput"),
-  state: document.getElementById("simPwdState"),
-};
-
-function spmSetState(msg="", type=""){
-  if(!spm.state) return;
-  spm.state.textContent = msg;
-  spm.state.style.color = (type === "err") ? "#ff6b6b" : "#9bb0d0";
-}
-
-function openSimPwdModal(){
-  if(!spm.backdrop) return;
-  spm.input.value = "";
-  spmSetState("");
-  spm.backdrop.style.display = "block";
-  setTimeout(()=> spm.input.focus(), 0);
-}
-
-function closeSimPwdModal(){
-  if(!spm.backdrop) return;
-  spm.backdrop.style.display = "none";
-}
-
-function submitSimPwd(){
-  const input = String(spm.input.value || "").trim();
-
-  if(!input){
-    spmSetState("비밀번호를 입력해줘.", "err");
-    spm.input.focus();
-    return;
-  }
-
-  if(input !== SIM_PASSWORD){
-    spmSetState("❌ 비밀번호가 틀렸습니다.", "err");
-    setSimLocked(true);
-    draw();
-    spm.input.select();
-    return;
-  }
-
-  // 성공
-  spmSetState("✅ 잠금 해제 완료!", "");
-  state.simUnlockedOnce = true;
-  // ✅ 이번 탭(세션) 동안은 다시 안 묻게 저장
-sessionStorage.setItem("SIM_UNLOCKED", "1");
-
-  setSimLocked(false);
-  draw();
-  closeSimPwdModal();
-}
-
-// 이벤트 연결
-if(spm.backdrop && spm.close && spm.cancel && spm.submit && spm.input){
-  spm.close.addEventListener("click", closeSimPwdModal);
-  spm.cancel.addEventListener("click", closeSimPwdModal);
-  spm.submit.addEventListener("click", submitSimPwd);
-
-  spm.backdrop.addEventListener("mousedown", (e)=>{
-    if(e.target === spm.backdrop) closeSimPwdModal();
-  });
-
-  spm.input.addEventListener("keydown", (e)=>{
-    if(e.key === "Enter"){
-      e.preventDefault();
-      submitSimPwd();
-    }
-    if(e.key === "Escape"){
-      closeSimPwdModal();
-    }
-  });
-}
-  // ✅ 잠김 배너 클릭하면 비번 모달 열기
-if(els.lockBanner){
-  els.lockBanner.addEventListener("click", ()=>{
-    if(state.simLocked) askSimPassword();
-  });
-}
 
 
 function bmSetState(msg="", type=""){
